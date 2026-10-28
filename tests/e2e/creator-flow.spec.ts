@@ -71,3 +71,47 @@ test('conectar un proveedor no descarta el lote en preparación', async ({ page 
   await page.getByRole('button', { name: 'Atrás', exact: true }).click();
   await expect(page.locator('.question-option[aria-pressed=true]')).toHaveCount(1);
 });
+
+test('explica el bloqueo de Runway y permite producir un video local desde el creador', async ({
+  page,
+}) => {
+  await page.request.post('/api/login', {
+    headers: { Origin: process.env.APP_URL ?? 'http://localhost:3000' },
+    data: { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD },
+  });
+  await page.route('**/api/studio', async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    data.runway = { ...data.runway, configured: true, avatarConfigured: false, credits: 0 };
+    await route.fulfill({ response, json: data });
+  });
+  await page.goto('/#create');
+  await page.locator('.question-option').first().click();
+  await page.getByRole('button', { name: 'Continuar a formato' }).click();
+  await page.getByRole('button', { name: /Dino responde/ }).click();
+  await page.getByRole('button', { name: 'Revisar contenido' }).click();
+  await page.getByRole('button', { name: 'Preparar producción' }).click();
+  await expect(
+    page.getByText('Runway conectado: faltan saldo de API y preparar el dinosaurio.', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const response = page.waitForResponse(
+    (r) => r.url().endsWith('/api/batches') && r.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: 'Generar 1 video', exact: true }).click();
+  const batch = await response;
+  expect(batch.status()).toBe(201);
+  const batchId = (await batch.json()).id;
+  await expect
+    .poll(
+      async () => {
+        const data = await (await page.request.get('/api/studio')).json();
+        const job = data.jobs.find((j: { batch_id: string }) => j.batch_id === batchId);
+        if (job?.status === 'failed') throw new Error(job.error_message);
+        return job?.status;
+      },
+      { timeout: 170000, intervals: [2000, 4000] },
+    )
+    .toBe('completed');
+});

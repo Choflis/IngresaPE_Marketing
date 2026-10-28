@@ -59,7 +59,7 @@ Si necesitas cambiar la contraseña: modifica `ADMIN_PASSWORD` en `.env` y ejecu
 1. Entra a **Crear contenido** y selecciona preguntas aprobadas por área.
 2. Continúa a **Formato** y elige cómo presentar la lección.
 3. En **Revisión**, comprueba la respuesta correcta y la explicación.
-4. En **Producción**, selecciona demostración local para video o genera el PNG/carrusel. Verás el resumen antes de enviar.
+4. En **Producción**, selecciona **Video local** para crear un MP4 sin API, o genera el PNG/carrusel. Verás el resumen antes de enviar.
 5. Sigue el lote en Vista general y descarga desde **Biblioteca**. Puedes retroceder o ir a Configuración sin perder la selección mientras mantengas abierta la página.
 
 ![Creador académico por pasos](docs/screenshots/academic-creator.png)
@@ -109,6 +109,10 @@ Este comando envía **una sola generación corta**, guarda el task ID y descarga
 El presupuesto mensual protege **lotes creados en el panel**; las herramientas CLI y consumos externos de tu cuenta no pasan por esa reserva. Las reservas son conservadoras y no equivalen al saldo ni a una factura. Los trabajos enviados, incluso fallidos o cancelados después del envío, conservan su reserva porque pueden tener costo.
 
 **Estado de la verificación real:** consultar [docs/verification.md](docs/verification.md). Sin credenciales con saldo no se puede afirmar que el dinosaurio haya sido generado por Runway. La demostración local siempre se identifica como tal.
+
+### Si Runway aparece deshabilitado
+
+Una clave válida conecta la cuenta; el dinosaurio hablando necesita además un avatar listo y saldo de API. El creador muestra qué requisito falta. Para producir sin esperar, elige **Video local → Generar video**: obtendrás un MP4 con movimiento de muestra, identificado como demostración y sin voz. Después se descarga desde Biblioteca.
 
 ### Recuperar un envío incierto
 

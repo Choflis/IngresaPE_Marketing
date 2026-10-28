@@ -62,6 +62,13 @@ export function Creator({
   const chosen = d.questions.filter((q) => selected.includes(q.id));
   const q = chosen[0] ?? qs[0];
   const configured = d.runway.configured && d.runway.avatarConfigured;
+  const runwayBlockReason = !d.runway.configured
+    ? 'Conecta tu API key de Runway desde Configuración.'
+    : !d.runway.avatarConfigured
+      ? d.runway.credits === 0
+        ? 'Runway conectado: faltan saldo de API y preparar el dinosaurio.'
+        : 'Runway conectado: falta preparar el dinosaurio en Configuración.'
+      : null;
   const cost =
     template?.kind === 'video' && provider === 'runway'
       ? chosen.reduce((n, q) => n + estimateCostCents(narrationFor(q)), 0)
@@ -433,14 +440,17 @@ export function Creator({
                           <small>
                             {configured
                               ? 'Una actuación y una voz para cada explicación.'
-                              : 'Conecta tu cuenta y prepara el personaje para activarlo.'}
+                              : runwayBlockReason}
                           </small>
                         </div>
                         <span className="radio">{provider === 'runway' && <i />}</span>
                       </button>
                       {!configured && (
                         <button className="connect-inline" onClick={() => go('settings')}>
-                          Conectar Runway en Configuración <ArrowRight size={16} />
+                          {d.runway.configured
+                            ? 'Completar configuración de Runway'
+                            : 'Conectar Runway en Configuración'}{' '}
+                          <ArrowRight size={16} />
                         </button>
                       )}
                       <button
@@ -450,15 +460,28 @@ export function Creator({
                         <span className="provider-symbol">ip</span>
                         <div>
                           <strong>
-                            Prueba del formato <span className="mini-tag">LOCAL</span>
+                            Video local <span className="mini-tag">SIN API</span>
                           </strong>
                           <small>
-                            Verifica el diseño con movimiento de muestra, sin voz ni costo de API.
+                            Crea un MP4 con el dinosaurio en movimiento de muestra, sin voz ni costo
+                            de API.
                           </small>
                         </div>
                         <span className="radio">{provider === 'demo' && <i />}</span>
                       </button>
                     </div>
+                    {!configured && (
+                      <div className="academic-tip">
+                        <TriangleAlert size={20} />
+                        <p>
+                          Para crear un video ahora, elige <strong>Video local</strong> y pulsa{' '}
+                          <strong>
+                            Generar {selected.length} {selected.length === 1 ? 'video' : 'videos'}
+                          </strong>
+                          . Para el dinosaurio hablando, completa los requisitos de Runway.
+                        </p>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="academic-tip">
