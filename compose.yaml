@@ -14,6 +14,7 @@ services:
       retries: 20
   web:
     profiles: ['app']
+    image: ingresape-studio:local
     build: .
     env_file: .env
     environment:
@@ -28,6 +29,7 @@ services:
     restart: unless-stopped
   worker:
     profiles: ['app']
+    image: ingresape-studio:local
     build: .
     env_file: .env
     environment:
@@ -38,6 +40,12 @@ services:
       web: { condition: service_healthy }
     volumes: ['media_data:/app/storage']
     command: ['sh', '-c', 'npm run db:migrate && npm run worker']
+    healthcheck:
+      test: ['CMD', 'npm', 'run', 'worker:health']
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 4
     shm_size: 1gb
     restart: unless-stopped
 volumes:

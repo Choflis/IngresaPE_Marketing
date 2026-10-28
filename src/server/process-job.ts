@@ -84,7 +84,8 @@ async function providerClip(jobId: string, text: string, dir: string) {
     }
   }
   await setState(jobId, 'generating');
-  for (let n = 0; n < 240; n++) {
+  const deadline = Date.now() + 20 * 60 * 1000;
+  for (let n = 0; n < 240 && Date.now() < deadline; n++) {
     if (await cancelled(jobId)) return null;
     const task = await pollRunway(request.remote_task_id);
     if (task.status === 'SUCCEEDED') {

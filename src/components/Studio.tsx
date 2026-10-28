@@ -271,6 +271,7 @@ function Dashboard({
   go: (s: Screen) => void;
   onJobAction: (id: string, a: string) => Promise<void>;
 }) {
+  const [visibleJobs, setVisibleJobs] = useState(8);
   const active = d.stats.active;
   const complete = d.stats.completed;
   const reserved = d.stats.reserved_cents;
@@ -403,7 +404,20 @@ function Dashboard({
           <span className="counter">{d.stats.total_jobs} trabajos</span>
         </div>
         {d.jobs.length ? (
-          <JobsTable jobs={d.jobs.slice(0, 8)} onAction={onJobAction} />
+          <>
+            <JobsTable jobs={d.jobs.slice(0, visibleJobs)} onAction={onJobAction} />
+            {visibleJobs < d.jobs.length && (
+              <div className="jobs-pagination">
+                <span>
+                  Mostrando {Math.min(visibleJobs, d.jobs.length)} de {d.jobs.length} trabajos
+                  recientes
+                </span>
+                <button className="button small" onClick={() => setVisibleJobs((n) => n + 12)}>
+                  Mostrar más trabajos
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <Empty
             title="Tu primera producción empieza aquí"

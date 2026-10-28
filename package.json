@@ -23,7 +23,8 @@
     "test:db": "tsx scripts/test-db.ts",
     "account:reset": "tsx scripts/reset-account.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "worker:health": "tsx scripts/worker-health.ts"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.539",

@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { query, transaction } from '../lib/db';
 import { questionInput, templateInput } from '../lib/validation';
 import type { Question, Template } from '../lib/types';
@@ -10,8 +11,11 @@ export async function getQuestions() {
     `${questionSelect} WHERE v.version=(SELECT max(version) FROM question_versions WHERE question_id=q.id) ORDER BY q.created_at DESC LIMIT 1000`,
   );
 }
-export async function getQuestionVersion(id: string) {
-  return (await query<Question>(`${questionSelect} WHERE v.id=$1`, [id]))[0];
+export async function getQuestionVersion(id: string, client?: PoolClient) {
+  const sql = `${questionSelect} WHERE v.id=$1`;
+  return client
+    ? (await client.query<Question>(sql, [id])).rows[0]
+    : (await query<Question>(sql, [id]))[0];
 }
 export async function createQuestion(input: unknown) {
   const v = questionInput.parse(input);

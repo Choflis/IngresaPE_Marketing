@@ -189,7 +189,7 @@ npm run test:e2e
 
 ## Alcance de esta versión
 
-Herramienta para un propietario. No publica automáticamente en redes. Los formatos son variantes de las composiciones incluidas; no hay editor libre de escenas. El avatar real y la voz requieren validar calidad con la imagen y cuenta de Runway. El listado carga hasta 1.000 preguntas y los 300 trabajos/archivos más recientes; la base y la cola conservan los demás.
+Herramienta para un propietario. No publica automáticamente en redes. Los formatos son variantes de las composiciones incluidas; no hay editor libre de escenas. El avatar real y la voz requieren validar calidad con la imagen y cuenta de Runway. Los formatos cortos admiten hasta 240 caracteres de pregunta, 400 de explicación y 650 entre pregunta y alternativas, para conservar legibilidad. El listado carga hasta 1.000 preguntas y los 300 trabajos/archivos más recientes; la base y la cola conservan los demás.
 
 El MP4 de demostración anima la imagen de marca, **no simula una actuación real ni una voz de Runway**. Las imágenes con plantillas evitan una API visual pagada, pero consumen servidor, almacenamiento y, si se habilita, modelos externos.
 

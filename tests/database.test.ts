@@ -98,6 +98,14 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
     expect(a.id).toBe(b.id);
     expect((await db.query('SELECT * FROM video_jobs')).length).toBe(1);
   });
+  it('procesa solicitudes concurrentes del tamaño del pool sin agotar conexiones', async () => {
+    const q = await question();
+    const input = { questionIds: [q.id], templateVersionId: templateId, provider: 'demo' };
+    const results = await Promise.allSettled(
+      Array.from({ length: 10 }, () => production.createBatch(input, owner, randomUUID())),
+    );
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(10);
+  });
   it('rechaza una pregunta sin aprobación y no deja lote parcial', async () => {
     const q = await question(false);
     await expect(
@@ -180,6 +188,38 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
       'queued',
     );
     expect(vi.mocked(gateway.submitAvatar)).not.toHaveBeenCalled();
+  });
+  it('mantiene trabajos de más de 60 segundos y recupera un heartbeat perdido', async () => {
+    const { PgBoss } = await import('pg-boss');
+    const { productionQueueOptions } = await import('../src/server/queue-config');
+    const boss = new PgBoss({ connectionString: process.env.TEST_DATABASE_URL! });
+    boss.on('error', () => {});
+    await boss.start();
+    const name = `regression-${randomUUID()}`;
+    try {
+      await boss.createQueue(name, { ...productionQueueOptions, policy: 'exclusive' });
+      const id = await boss.send(name, { test: true });
+      await boss.fetch(name);
+      await db.query(
+        "UPDATE pgboss.job SET started_on=now()-interval '61 seconds',heartbeat_on=now() WHERE id=$1",
+        [id],
+      );
+      await boss.supervise(name);
+      expect((await boss.getJobById(name, id!))?.state).toBe('active');
+      await db.query(
+        "UPDATE pgboss.job SET heartbeat_on=now()-interval '120 seconds' WHERE id=$1",
+        [id],
+      );
+      await db.query(
+        "UPDATE pgboss.queue SET monitor_claim_on=now()-interval '120 seconds',monitor_on=now()-interval '120 seconds' WHERE name=$1",
+        [name],
+      );
+      await boss.supervise(name);
+      expect((await boss.getJobById(name, id!))?.state).toBe('retry');
+    } finally {
+      await boss.deleteQueue(name);
+      await boss.stop();
+    }
   });
   it('recupera una solicitud en envío interrumpido sin crear otra', async () => {
     const q = await question();

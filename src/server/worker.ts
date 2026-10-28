@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import { PgBoss } from 'pg-boss';
+import { writeFile } from 'node:fs/promises';
+import { productionQueueOptions } from './queue-config';
 import { randomUUID } from 'node:crypto';
 import { pool, query } from '../lib/db';
 import { processJob } from './process-job';
@@ -10,30 +12,14 @@ if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8)
 const boss = new PgBoss({ connectionString: process.env.DATABASE_URL!, max: 5 });
 boss.on('error', (e) => console.error('Error de cola', e.message));
 await boss.start();
-await boss.createQueue('studio-produce', {
-  policy: 'exclusive',
-  retryLimit: 2,
-  retryDelay: 10,
-  expireInSeconds: 60,
-  deleteAfterSeconds: 86400,
-});
-await boss.updateQueue('studio-produce', { retryLimit: 2, retryDelay: 10, expireInSeconds: 60 });
+await boss.createQueue('studio-produce', { policy: 'exclusive', ...productionQueueOptions });
+await boss.updateQueue('studio-produce', productionQueueOptions);
+await writeFile('/tmp/ingresape-worker-id', workerId, { mode: 0o600 });
 await boss.work<{ jobId: string }>(
   'studio-produce',
-  { localConcurrency: concurrency, pollingIntervalSeconds: 1 },
+  { localConcurrency: concurrency, pollingIntervalSeconds: 1, heartbeatRefreshSeconds: 20 },
   async (jobs) => {
-    for (const job of jobs) {
-      const heartbeat = setInterval(() => {
-        boss
-          .touch('studio-produce', job.id)
-          .catch(() => console.error('No se pudo renovar la tarea', job.id));
-      }, 20000);
-      try {
-        await processJob(job.data.jobId);
-      } finally {
-        clearInterval(heartbeat);
-      }
-    }
+    for (const job of jobs) await processJob(job.data.jobId);
   },
 );
 let dispatching = false;

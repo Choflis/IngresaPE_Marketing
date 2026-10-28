@@ -6,12 +6,24 @@ Fecha: 2026-10-28. Entorno local Linux, Node 26.11.1 y PostgreSQL 17 en Docker. 
 
 - TypeScript estricto: `npm run typecheck`, sin errores.
 - Dominio: 12 pruebas unitarias aprobadas (validación y políticas de solicitudes).
-- Base real aislada: 9 pruebas aprobadas con `npm run test:db`; cubren normalización, rollback, idempotencia concurrente, versiones, presupuesto simultáneo, incertidumbre y recuperación del proveedor.
+- Base real aislada: 11 pruebas aprobadas con `npm run test:db`; cubren normalización, rollback, idempotencia concurrente, versiones, presupuesto simultáneo, incertidumbre y recuperación del proveedor.
 - Build Next.js de producción: completado.
 - Auditoría npm: sin vulnerabilidades después de fijar Zod transitorio a la versión parcheada mediante overrides.
-- Imagen Docker: build completado; se vuelve a validar con los archivos finales antes del push.
+- Imagen Docker: build completado. Runtime comprobado en Node 24.22.1: web y worker saludables, login autenticado y un MP4 generado dentro del contenedor, con descarga privada HTTP 206.
 - Producción real de medios locales: PNG y dos MP4 completados en la instalación de prueba. Esto es composición local, no generación real del proveedor.
-- E2E de navegador: verificación final en curso; se registrará el resultado antes del push.
+- E2E de navegador: 2 pruebas aprobadas. Flujo completo de medios y regresión para acceder a los controles de los 25 trabajos de un lote.
+
+## Revisión independiente
+
+Se revisó el código con un segundo agente en modo de solo lectura. Se corrigieron tres hallazgos materiales:
+
+1. Hidratación de preguntas dentro del mismo cliente transaccional, evitando agotar el pool al recibir diez lotes concurrentes. La regresión reprodujo el timeout antes del cambio y ahora aprueba las diez solicitudes.
+2. Acceso progresivo a todos los trabajos cargados, incluyendo los controles de recuperación de un lote de 25.
+3. Separación entre límite duro de una hora y heartbeat de 60 segundos con renovación automática; la prueba de pg-boss real desplaza los timestamps y ejecuta su supervisor para demostrar que una tarea sana de más de 60 segundos sigue activa y que un heartbeat perdido vuelve a la cola.
+
+También se sustituyó el healthcheck HTTP heredado del worker por uno que comprueba su propio heartbeat en PostgreSQL.
+
+Se verificó por separado el montaje de un clip local con audio sintético: el MP4 resultante contiene video H.264 de 720 × 1280 y audio AAC. Esta prueba verifica que el montaje conserva audio; no es una prueba de Runway.
 
 ## Runway
 

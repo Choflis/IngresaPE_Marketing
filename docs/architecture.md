@@ -15,7 +15,7 @@
 
 El lote y sus trabajos se insertan en una única transacción. Una clave de idempotencia por propietario permite repetir la solicitud HTTP sin duplicar el lote. El cliente conserva esa clave ante errores de red. La fila del trabajo actúa como outbox: si el servidor se cae antes de despachar a pg-boss, el worker lo descubre después.
 
-La cola utiliza política `exclusive` por ID de trabajo. Un advisory lock por trabajo evita que dos procesos monten el mismo contenido a la vez, incluso al recuperarse una tarea. La concurrencia se configura por proceso; al aumentar réplicas también crece la concurrencia total. El banco y las plantillas se referencian por versiones concretas.
+La cola utiliza política `exclusive` por ID de trabajo. Un advisory lock por trabajo evita que dos procesos monten el mismo contenido a la vez, incluso al recuperarse una tarea. El límite duro de ejecución es de una hora; el heartbeat de 60 segundos se renueva automáticamente cada 20 segundos. La detección de caída no depende del límite duro. La concurrencia se configura por proceso; al aumentar réplicas también crece la concurrencia total. El banco y las plantillas se referencian por versiones concretas.
 
 Antes de llamar al proveedor se registra una solicitud en estado `submitting`. Se desactiva el reintento automático del SDK para las creaciones pagadas. Si se recibe el ID, se persiste y los siguientes intentos consultan ese ID. Si el resultado del envío es ambiguo, el trabajo pasa a `needs_attention`: el propietario debe comprobar el portal y vincular la tarea original. Esto prioriza evitar un segundo cobro sobre reintentar a ciegas. No es posible garantizar exactly-once sobre un servicio externo sin idempotencia compartida.
 

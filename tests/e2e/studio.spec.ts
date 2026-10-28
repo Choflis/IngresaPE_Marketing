@@ -116,3 +116,31 @@ test('acceso privado y flujo real de imágenes y videos por lote', async ({ page
   await expect(page).toHaveURL(/login/);
   expect((await page.request.get('/api/studio')).status()).toBe(401);
 });
+
+test('permite acceder a la recuperación de los 25 trabajos de un lote', async ({ page }) => {
+  const auth = await page.request.post('/api/login', {
+    headers: { Origin: process.env.APP_URL ?? 'http://localhost:3000' },
+    data: { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD },
+  });
+  expect(auth.ok()).toBeTruthy();
+  await page.route('**/api/studio', async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    const base = data.jobs[0];
+    data.jobs = Array.from({ length: 25 }, (_, i) => ({
+      ...base,
+      id: randomUUID(),
+      statement: `Trabajo pendiente de revisión ${i + 1}`,
+      status: 'needs_attention',
+      output_asset_id: null,
+      error_message: null,
+    }));
+    data.stats.total_jobs = 25;
+    await route.fulfill({ response, json: data });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Vincular tarea' })).toHaveCount(8);
+  await page.getByRole('button', { name: 'Mostrar más trabajos' }).click();
+  await page.getByRole('button', { name: 'Mostrar más trabajos' }).click();
+  await expect(page.getByRole('button', { name: 'Vincular tarea' })).toHaveCount(25);
+});

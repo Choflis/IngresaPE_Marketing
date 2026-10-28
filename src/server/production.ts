@@ -40,7 +40,7 @@ export async function createBatch(input: unknown, ownerId: string, key: string) 
       throw new HttpError(400, 'Selecciona preguntas existentes con explicación aprobada.');
     const entries = [];
     for (const ver of versions) {
-      const q = await getQuestionVersion(ver.id);
+      const q = await getQuestionVersion(ver.id, c);
       try {
         assertRenderable(q);
       } catch (e) {
