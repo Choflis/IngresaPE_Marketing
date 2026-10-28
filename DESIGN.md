@@ -1,25 +1,25 @@
-# Ingresa PE Studio · contrato de diseño
+# Ingresa PE Studio 0.2 · contrato visual
 
-Diseño desarrollado con los workflows `frontend-design` y `dashboard` de [Open Design](https://github.com/nexu-io/open-design), tomando la precisión de su sistema `linear-app` y sustituyendo la paleta por la identidad de Ingresa PE. La salida es una aplicación Next.js funcional, adaptando el formato HTML del template a componentes React.
+Interfaz académica clara aplicada con [Open Design](https://github.com/nexu-io/open-design), sus skills `frontend-design` e `impeccable-design-polish`.
 
-## Color
+## Paleta
 
-- Canvas: #090D16. Panel: #101623. Elevado: #161E2D.
-- Marca: #C80727. Hover: #E12C47. Fondo seleccionado: #C807271A.
-- Texto: #F5F6FA. Secundario: #A7B0C2. Bordes: #FFFFFF12.
-- Éxito: #6DD5AC. Advertencia: #F4C16D. Errores: #FF8194.
-- Áreas: Biomédicas verde; Ingenierías azul; Sociales ámbar, siempre con etiqueta textual.
+Canvas cálido #F7F6F2, panel blanco, superficie secundaria #F1EEE7, texto #24262E, secundario #6E707A, borde #E7E4DC. Rojo de interfaz #BD1737, derivado de la identidad #C80727. Estados y áreas incluyen texto además del color. El reproductor mantiene fondo oscuro para distinguir la pieza del panel.
 
-## Tipografía
+## Tipografía y composición
 
-Manrope para interfaz y titulares; monospace para IDs. Titular 30/36, cuerpo 14/22, metadatos 12/18. Peso 400, 500, 600, 700. Jerarquía mediante espacio y contraste.
+Manrope local para interfaz; titulares editoriales serif en el hero. Cuerpo 15px, campos 14px, metadatos 12px. Espacios generosos, bordes finos y controles principales de 44px. Sidebar persistente en escritorio y navegación adaptada en móvil.
 
-## Layout y componentes
+## Flujo
 
-Sidebar 232px. Topbar 76px. Contenido máximo 1500px con padding 32px. Cards radio 14px, inputs 9px, bordes finos. Densidad de herramienta personal; hero de producción con mascota oficial y preview vertical. Botón rojo solo en acción principal. Tabla de trabajos con progreso verificable. Datos cero cuando no existen trabajos. Foco visible, labels, mensajes de error y estados sin datos. Navegación colapsada en móvil, controles de al menos 40px, reduced-motion respetado.
+Cuatro pasos: preguntas, formato, revisión y producción. Se impide avanzar sin selección; volver conserva el lote. La revisión muestra respuesta y explicación. El paso final distingue Runway y demostración local, entrega y reserva estimada. Cambiar a Configuración conserva el borrador durante la sesión de página. La vista previa de imagen es una maqueta identificada; el archivo final se compone con Sharp.
 
-## Assets y procedencia
+## Movimiento y accesibilidad
+
+Transiciones breves, feedback de selección, dinosaurio en el reproductor y estados de carga. Se respeta reduced-motion. Foco visible, etiquetas, mensajes de error, contraste y ausencia de overflow comprobados en navegador móvil y escritorio.
+
+## Assets
 
 Logo: https://ingresa.pe/logo-horizontal.png
 Personaje: https://ingresa.pe/video-character-poster.webp
-Colores extraídos del CSS público el 2026-10-28. Estos recursos pertenecen a Ingresa PE.
+Recursos propiedad de Ingresa PE. No se modifican sus derechos.

@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import { runwayClient, providerError } from '../src/server/runway';
-if (!process.env.RUNWAYML_API_SECRET) {
+import { getProviderSettings } from '../src/server/provider-settings';
+if (!getProviderSettings().apiKey) {
   console.error(
-    'PENDIENTE: añade RUNWAYML_API_SECRET a .env. No se hizo ninguna generación ni cargo.',
+    'PENDIENTE: conecta tu API key desde Configuración o RUNWAYML_API_SECRET en .env. No se hizo ninguna generación ni cargo.',
   );
   process.exitCode = 2;
 } else {

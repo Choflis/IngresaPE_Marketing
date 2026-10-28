@@ -2,6 +2,7 @@ import { query, transaction } from '../lib/db';
 import { batchInput, estimateCostCents, narrationFor, assertRenderable } from '../lib/validation';
 import { HttpError } from '../lib/auth';
 import { getQuestionVersion } from './catalog';
+import { publicProviderStatus } from './provider-settings';
 import type { Job } from '../lib/types';
 export async function createBatch(input: unknown, ownerId: string, key: string) {
   const v = batchInput.parse(input);
@@ -24,11 +25,11 @@ export async function createBatch(input: unknown, ownerId: string, key: string) 
     const provider = t.kind === 'video' ? v.provider : 'demo';
     if (
       provider === 'runway' &&
-      (!process.env.RUNWAYML_API_SECRET || !process.env.RUNWAY_AVATAR_ID)
+      (!publicProviderStatus().configured || !publicProviderStatus().avatarConfigured)
     )
       throw new HttpError(
         400,
-        'Configura RUNWAYML_API_SECRET y RUNWAY_AVATAR_ID para usar el dinosaurio de Runway.',
+        'Conecta Runway y prepara tu dinosaurio desde Configuración antes de generar.',
       );
     const versions = (
       await c.query(

@@ -24,7 +24,14 @@ export type StudioData = {
   assets: Asset[];
   workerOnline: boolean;
   stats: { total_jobs: number; completed: number; active: number; reserved_cents: number };
-  runway: { configured: boolean; avatarConfigured: boolean; monthlyBudgetCents: number };
+  runway: {
+    configured: boolean;
+    avatarStatus?: string;
+    verifiedAt?: string | null;
+    credits?: number | null;
+    avatarConfigured: boolean;
+    monthlyBudgetCents: number;
+  };
 };
 export type Screen = 'home' | 'create' | 'questions' | 'templates' | 'library' | 'settings';
 export async function api(path: string, data?: unknown, headers: Record<string, string> = {}) {

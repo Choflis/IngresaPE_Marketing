@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './academic.css';
 export const metadata: Metadata = {
   title: 'Ingresa PE · Studio',
   description: 'Tu espacio privado para crear contenido que enseña.',

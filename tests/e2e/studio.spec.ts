@@ -10,9 +10,13 @@ test('acceso privado y flujo real de imágenes y videos por lote', async ({ page
   await page.getByLabel('Correo electrónico').fill(process.env.ADMIN_EMAIL!);
   await page.getByLabel('Contraseña', { exact: true }).fill(process.env.ADMIN_PASSWORD!);
   await page.getByRole('button', { name: 'Entrar al estudio' }).click();
-  await expect(page.getByRole('heading', { name: /Hoy es un buen día/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Aquí empieza una buena lección/ })).toBeVisible();
   await mkdir('docs/screenshots', { recursive: true });
-  await page.screenshot({ path: 'docs/screenshots/dashboard.png', fullPage: true });
+  await page.screenshot({
+    path: 'docs/screenshots/dashboard.png',
+    fullPage: true,
+    animations: 'disabled',
+  });
   const studio = await (await page.request.get('/api/studio')).json();
   expect(studio.areas).toHaveLength(3);
   // CSRF protection: an authenticated session is not enough for foreign origins.
@@ -45,13 +49,20 @@ test('acceso privado y flujo real de imágenes y videos por lote', async ({ page
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole('button', { name: testQuestion })).toBeVisible();
   await page.getByRole('button', { name: 'Crear contenido', exact: true }).first().click();
-  await expect(page.getByRole('heading', { name: 'Vamos a crear.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prepara tu próxima clase.' })).toBeVisible();
   await expect(page.locator('.question-option').first()).toBeVisible();
   await page.locator('.question-option').first().click();
-  await page.screenshot({ path: 'docs/screenshots/creator.png', fullPage: true });
+  await page.screenshot({
+    path: 'docs/screenshots/creator.png',
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.getByRole('button', { name: 'Continuar a formato' }).click();
   await page.getByRole('button', { name: /Pregunta del día/ }).click();
-  await page.getByRole('button', { name: /Producir 1 publicaciones/ }).click();
-  await expect(page.getByRole('heading', { name: /Hoy es un buen día/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Revisar contenido' }).click();
+  await page.getByRole('button', { name: 'Preparar producción' }).click();
+  await page.getByRole('button', { name: /Generar 1 publicación/ }).click();
+  await expect(page.getByRole('heading', { name: /Aquí empieza una buena lección/ })).toBeVisible();
   const headers = {
     Origin: process.env.APP_URL ?? 'http://localhost:3000',
     'Idempotency-Key': randomUUID(),
@@ -110,7 +121,11 @@ test('acceso privado y flujo real de imágenes y videos por lote', async ({ page
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  await page.screenshot({ path: 'docs/screenshots/mobile.png', fullPage: true });
+  await page.screenshot({
+    path: 'docs/screenshots/mobile.png',
+    fullPage: true,
+    animations: 'disabled',
+  });
   await page.getByRole('button', { name: 'Abrir menú' }).click();
   await page.getByRole('button', { name: 'Cerrar sesión' }).click();
   await expect(page).toHaveURL(/login/);

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { RunwayConnection } from './RunwayConnection';
 import {
   Plus,
   ArrowUpRight,
@@ -69,9 +70,21 @@ export function Templates({
                 <div className="mini-post">
                   <img src="/brand/logo.png" alt="Ingresa PE" />
                   <strong>
-                    {t.kind === 'carousel'
-                      ? 'Aprende.<br/>Entiende.<br/>Recuerda.'
-                      : 'Tu pregunta<br/>del día.'}
+                    {t.kind === 'carousel' ? (
+                      <>
+                        Aprende.
+                        <br />
+                        Entiende.
+                        <br />
+                        Recuerda.
+                      </>
+                    ) : (
+                      <>
+                        Tu pregunta
+                        <br />
+                        del día.
+                      </>
+                    )}
                   </strong>
                   <span>PREPÁRATE PARA LA UNSA ↗</span>
                   {t.kind === 'carousel' && <div className="slide-dots">● ○ ○</div>}
@@ -325,12 +338,12 @@ export function Library({
 export function Configuration({
   data: d,
   notify,
+  refresh,
 }: {
   data: StudioData;
   notify: (s: string) => void;
+  refresh: () => Promise<void>;
 }) {
-  const [checking, setChecking] = useState(false),
-    [result, setResult] = useState('');
   return (
     <>
       <div className="page-heading">
@@ -347,70 +360,7 @@ export function Configuration({
         </span>
       </div>
       <div className="settings-grid">
-        <section className="content-panel settings-panel">
-          <div className="settings-title">
-            <div className="provider-symbol runway">R</div>
-            <div>
-              <h2>Runway</h2>
-              <p>El movimiento y la voz de tu dinosaurio.</p>
-            </div>
-            <span
-              className={`status ${d.runway.configured && d.runway.avatarConfigured ? 'status-completed' : 'status-queued'}`}
-            >
-              {d.runway.configured && d.runway.avatarConfigured ? 'Configurado' : 'Pendiente'}
-            </span>
-          </div>
-          <div className="setting-row">
-            <span>API key</span>
-            <strong>{d.runway.configured ? 'Configurada en servidor' : 'Sin configurar'}</strong>
-          </div>
-          <div className="setting-row">
-            <span>Avatar del dinosaurio</span>
-            <strong>{d.runway.avatarConfigured ? 'Configurado' : 'Pendiente de creación'}</strong>
-          </div>
-          <div className="setting-row">
-            <span>Presupuesto mensual reservado</span>
-            <strong>{money(d.runway.monthlyBudgetCents)} USD</strong>
-          </div>
-          <div className="code-help">
-            <span>1. Añade la clave a tu .env</span>
-            <code>RUNWAYML_API_SECRET=…</code>
-            <span>2. Crea el avatar con la imagen de tu marca</span>
-            <code>npm run runway:avatar</code>
-            <span>3. Guarda el ID y reinicia web y worker</span>
-            <code>RUNWAY_AVATAR_ID=…</code>
-          </div>
-          <div className="settings-actions">
-            <button
-              className="button"
-              disabled={!d.runway.configured || checking}
-              onClick={async () => {
-                setChecking(true);
-                try {
-                  const r = await api('runway/check', {});
-                  setResult(r.message);
-                  notify('Conexión verificada.');
-                } catch (e) {
-                  setResult(e instanceof Error ? e.message : 'No se pudo conectar.');
-                } finally {
-                  setChecking(false);
-                }
-              }}
-            >
-              {checking ? <LoaderCircle className="spin" size={16} /> : <KeyRound size={16} />}
-              Probar conexión
-            </button>
-            <a
-              className="text-button"
-              href="https://dev.runwayml.com"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Portal de Runway <ExternalLink size={14} />
-            </a>
-          </div>
-          {result && <p className="notice">{result}</p>}
-        </section>
+        <RunwayConnection data={d} refresh={refresh} notify={notify} />
         <div className="settings-stack">
           <section className="content-panel settings-panel">
             <div className="settings-title">

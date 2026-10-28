@@ -56,13 +56,15 @@ Si necesitas cambiar la contraseña: modifica `ADMIN_PASSWORD` en `.env` y ejecu
 
 ### Primera producción sin API
 
-1. Entra a **Crear contenido**.
-2. Filtra por área y selecciona una o varias preguntas aprobadas.
-3. Elige **Dino responde** y **Demostración local**, o **Pregunta del día** para PNG.
-4. Pulsa **Producir**. Sigue el estado desde Vista general.
-5. Revisa y descarga desde **Biblioteca**.
+1. Entra a **Crear contenido** y selecciona preguntas aprobadas por área.
+2. Continúa a **Formato** y elige cómo presentar la lección.
+3. En **Revisión**, comprueba la respuesta correcta y la explicación.
+4. En **Producción**, selecciona demostración local para video o genera el PNG/carrusel. Verás el resumen antes de enviar.
+5. Sigue el lote en Vista general y descarga desde **Biblioteca**. Puedes retroceder o ir a Configuración sin perder la selección mientras mantengas abierta la página.
 
-![Creador con vista previa](docs/screenshots/creator.png)
+![Creador académico por pasos](docs/screenshots/academic-creator.png)
+
+![Revisión de la producción](docs/screenshots/academic-review.png)
 
 ## Ejecutar todo con Docker
 
@@ -87,38 +89,20 @@ No ejecutes simultáneamente la web local y la web Docker sobre el puerto 3000. 
 
 Necesitas una API key del **portal de desarrolladores de Runway con saldo**. Los créditos de la app web y los de API son independientes. Consulta las [condiciones y precios del proveedor](https://docs.dev.runwayml.com/guides/pricing/).
 
-1. Guarda la clave en `.env`:
+1. Abre **Configuración → Conecta tu aula con Runway**.
+2. Obtén una clave en [Runway Developers](https://dev.runway.com), pégala en el campo privado y pulsa **Verificar y conectar**. Se valida antes de guardar.
+3. Con saldo disponible, pulsa **Preparar dinosaurio** y después **Comprobar estado** hasta que esté listo. Si ya tienes un avatar, conecta su ID al guardar la clave.
+4. Vuelve al creador y selecciona Runway en el paso Producción. La configuración se comparte con el worker sin reiniciarlo en la versión 0.2.
 
-```dotenv
-RUNWAYML_API_SECRET=tu_clave_privada
-```
-
-2. Comprueba autenticación y conexión; esta operación no genera videos:
+La clave se guarda en `storage/config/runway.json`, con permisos privados y excluida de Git. Respalda ese directorio de forma privada. `.env` sigue disponible como alternativa mediante `RUNWAYML_API_SECRET` y `RUNWAY_AVATAR_ID`; el archivo guardado desde el panel tiene prioridad.
 
 ```bash
 npm run runway:check
-```
-
-3. Registra tu dinosaurio como avatar. Por defecto utiliza la imagen de marca incluida; puedes indicar otra imagen local:
-
-```bash
-npm run runway:avatar
-# O: npm run runway:avatar -- /ruta/imagen-del-dinosaurio.png
-```
-
-El comando muestra el ID. Espera a que el avatar esté `READY` en el portal y guarda el valor:
-
-```dotenv
-RUNWAY_AVATAR_ID=uuid_del_avatar
-RUNWAY_MONTHLY_BUDGET_CENTS=1000
-```
-
-4. Reinicia la web y el worker. **Runway** aparecerá disponible en el creador.
-5. Para una prueba pagada corta, invocada explícitamente:
-
-```bash
+# Prueba corta pagada, solo con saldo y avatar listo:
 npm run runway:smoke
 ```
+
+**Comprobación de esta instalación:** conexión autenticada verificada el 2026-10-28; saldo de API: **0 créditos**. Falta recargar el saldo y preparar el avatar para generar el video real. No se compraron créditos.
 
 Este comando envía **una sola generación corta**, guarda el task ID y descarga el video a `storage/provider-tests/` si termina. No repitas el comando para consultar una solicitud anterior: cada ejecución genera un video nuevo. Conserva el comprobante JSON para consultar ese ID en el portal.
 
@@ -195,6 +179,6 @@ El MP4 de demostración anima la imagen de marca, **no simula una actuación rea
 
 ## Créditos
 
-Diseño implementado siguiendo [Open Design](https://github.com/nexu-io/open-design), sus workflows `frontend-design` y `dashboard`, y su referencia `linear-app`, adaptados a Ingresa PE. Logo, mascota y paleta provienen de la marca. Manrope se distribuye con su [licencia OFL](public/fonts/OFL.txt).
+Diseño implementado siguiendo [Open Design](https://github.com/nexu-io/open-design), sus skills `frontend-design` e `impeccable-design-polish`, adaptadas a una interfaz académica clara, adaptados a Ingresa PE. Logo, mascota y paleta provienen de la marca. Manrope se distribuye con su [licencia OFL](public/fonts/OFL.txt).
 
 Remotion tiene [condiciones de licencia propias](https://www.remotion.dev/docs/license/pricing), que dependen de la organización que lo utiliza. Este repositorio es una herramienta privada de Ingresa PE; no concede derechos sobre sus recursos de marca.

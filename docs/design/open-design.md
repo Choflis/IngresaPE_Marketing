@@ -1,8 +1,9 @@
 # Uso de Open Design
 
-Fuentes leídas y aplicadas el 2026-10-28:
+Fuentes leídas y aplicadas el 2026-10-28 (rediseño académico 0.2):
 
 - https://github.com/nexu-io/open-design/blob/main/skills/frontend-design/SKILL.md
+- https://github.com/nexu-io/open-design/blob/main/skills/impeccable-design-polish/SKILL.md
 - https://github.com/nexu-io/open-design/blob/main/design-templates/dashboard/SKILL.md
 - https://github.com/nexu-io/open-design/blob/main/design-systems/linear-app/DESIGN.md
 

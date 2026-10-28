@@ -93,7 +93,9 @@ export function Studio() {
       <aside className={`sidebar ${mobile ? 'mobile-open' : ''}`}>
         <div className="brand">
           <img src="/brand/logo.png" alt="Ingresa PE" />
-          <span>STUDIO</span>
+          <span>
+            STUDIO <b className="version-badge">0.2</b>
+          </span>
           <button
             className="icon-button mobile-close"
             onClick={() => setMobile(false)}
@@ -203,9 +205,9 @@ export function Studio() {
           ) : (
             <>
               {screen === 'home' && <Dashboard data={data} go={go} onJobAction={onJobAction} />}{' '}
-              {screen === 'create' && (
+              <div hidden={screen !== 'create'}>
                 <Creator data={data} refresh={refresh} notify={notify} go={go} />
-              )}{' '}
+              </div>{' '}
               {screen === 'questions' && (
                 <QuestionBank data={data} refresh={refresh} notify={notify} />
               )}{' '}
@@ -213,7 +215,9 @@ export function Studio() {
                 <Templates data={data} refresh={refresh} notify={notify} />
               )}{' '}
               {screen === 'library' && <Library data={data} refresh={refresh} notify={notify} />}{' '}
-              {screen === 'settings' && <Configuration data={data} notify={notify} />}
+              {screen === 'settings' && (
+                <Configuration data={data} notify={notify} refresh={refresh} />
+              )}
             </>
           )}
         </main>
@@ -279,11 +283,11 @@ function Dashboard({
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">TU ESPACIO CREATIVO</div>
+          <div className="eyebrow">EL ESTUDIO DE TU ACADEMIA</div>
           <h1>
-            Hoy es un buen día para crear<span className="red-dot">.</span>
+            Aquí empieza una buena lección<span className="red-dot">.</span>
           </h1>
-          <p>Convierte lo que sabes en contenido que acerca a otros a la UNSA.</p>
+          <p>Prepara contenido que enseña, resuelve dudas y acerca a tus estudiantes a la UNSA.</p>
         </div>
         <span className="date-label">
           {new Date().toLocaleDateString('es-PE', {
@@ -297,14 +301,14 @@ function Dashboard({
         <div className="hero-copy">
           <span className="hero-label">
             <span />
-            DE LA PREGUNTA AL VIDEO
+            APRENDER COMIENZA CON UNA PREGUNTA
           </span>
           <h2>
-            Tu dinosaurio.
+            Una pregunta.
             <br />
-            Un montón de
+            Un mundo de
             <br />
-            <em>buenas respuestas.</em>
+            <em>posibilidades.</em>
           </h2>
           <p>
             Elige una pregunta. Dale tu formato.
@@ -312,7 +316,7 @@ function Dashboard({
             Deja que tu personaje haga el resto.
           </p>
           <button className="button light" onClick={() => go('create')}>
-            Vamos a crear <ArrowUpRight size={18} />
+            Preparar una lección <ArrowUpRight size={18} />
           </button>
         </div>
         <div className="hero-art">
@@ -365,8 +369,8 @@ function Dashboard({
       </section>
       <div className="section-heading">
         <div>
-          <h2>Una comunidad. Tres caminos.</h2>
-          <p>Crea para quienes se preparan para su próximo gran paso.</p>
+          <h2>Cada área, una nueva oportunidad.</h2>
+          <p>Elige el camino de tus estudiantes y prepara algo que les ayude a avanzar.</p>
         </div>
         <button className="text-button" onClick={() => go('questions')}>
           Explorar preguntas <ArrowUpRight size={16} />
@@ -398,7 +402,7 @@ function Dashboard({
       <section className="content-panel">
         <div className="panel-heading">
           <div>
-            <h2>En tu estudio</h2>
+            <h2>Tu mesa de producción</h2>
             <p>La actividad más reciente de tus producciones.</p>
           </div>
           <span className="counter">{d.stats.total_jobs} trabajos</span>

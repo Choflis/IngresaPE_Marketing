@@ -2,11 +2,13 @@ import 'dotenv/config';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { submitAvatar, pollRunway, providerError } from '../src/server/runway';
 import { downloadProviderOutput } from '../src/server/storage';
+import { publicProviderStatus } from '../src/server/provider-settings';
 // Explicitly invoked, paid smoke test: one short request, no submission retries.
 const dir = 'storage/provider-tests';
-if (!process.env.RUNWAYML_API_SECRET || !process.env.RUNWAY_AVATAR_ID) {
+const readiness = publicProviderStatus();
+if (!readiness.configured || !readiness.avatarConfigured) {
   console.error(
-    'PENDIENTE: configura RUNWAYML_API_SECRET y RUNWAY_AVATAR_ID. No se hizo ninguna generación ni cargo.',
+    'PENDIENTE: conecta Runway y prepara tu dinosaurio en Configuración. No se hizo ninguna generación ni cargo.',
   );
   process.exitCode = 2;
 } else {

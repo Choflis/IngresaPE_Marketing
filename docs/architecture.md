@@ -29,7 +29,7 @@ Los IDs de proveedor y estado de solicitud están en `provider_requests`, con un
 
 ## Seguridad y operación
 
-Contraseñas bcrypt, sesión opaca de 256 bits con hash almacenado en DB, expiración a siete días, cookie HttpOnly y SameSite Strict. Origen exacto requerido para mutaciones; configuración HTTPS mediante APP_URL y AUTH_COOKIE_SECURE. Rate limit persistente de ocho intentos por correo en quince minutos. Queries parametrizadas. Uploads de imagen verificados con Sharp, límite de entrada de 10 MB y 25 megapíxeles, recodificación a PNG. Claves API únicamente en variables del servidor.
+Contraseñas bcrypt, sesión opaca de 256 bits con hash almacenado en DB, expiración a siete días, cookie HttpOnly y SameSite Strict. Origen exacto requerido para mutaciones; configuración HTTPS mediante APP_URL y AUTH_COOKIE_SECURE. Rate limit persistente de ocho intentos por correo en quince minutos. Queries parametrizadas. Uploads de imagen verificados con Sharp, límite de entrada de 10 MB y 25 megapíxeles, recodificación a PNG. Claves API únicamente en el servidor: configuración privada atómica en storage/config/runway.json (0600), compartida por web y worker, con variables de entorno como alternativa. El GET del estudio solo devuelve estado y saldo; nunca la clave.
 
 ## Fuentes investigadas
 

@@ -1,12 +1,13 @@
 import RunwayML from '@runwayml/sdk';
-export function runwayClient() {
-  if (!process.env.RUNWAYML_API_SECRET) throw new Error('Falta RUNWAYML_API_SECRET.');
-  return new RunwayML({ apiKey: process.env.RUNWAYML_API_SECRET, maxRetries: 0, timeout: 45000 });
+import { getProviderSettings } from './provider-settings';
+export function runwayClient(apiKey = getProviderSettings().apiKey) {
+  if (!apiKey) throw new Error('Falta RUNWAYML_API_SECRET.');
+  return new RunwayML({ apiKey, maxRetries: 0, timeout: 45000 });
 }
 export async function submitAvatar(text: string) {
   return runwayClient().avatarVideos.create({
     model: 'gwm1_avatars',
-    avatar: { type: 'custom', avatarId: process.env.RUNWAY_AVATAR_ID! },
+    avatar: { type: 'custom', avatarId: getProviderSettings().avatarId! },
     speech: { type: 'text', text },
   });
 }

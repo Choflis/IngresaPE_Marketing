@@ -26,6 +26,12 @@ import {
 import { createBatch, getJobs } from '@/server/production';
 import { canRetryJob } from '@/server/policy';
 import { cancelRunway, pollRunway, runwayClient, providerError } from '@/server/runway';
+import {
+  getProviderSettings,
+  saveProviderSettings,
+  publicProviderStatus,
+} from '@/server/provider-settings';
+import { withProviderLock } from '@/server/provider-lock';
 import { saveUpload, storageRoot } from '@/server/storage';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -103,11 +109,7 @@ async function handle(req: Request, ctx: Context) {
       assets,
       stats: stats[0],
       workerOnline: health[0].worker_online,
-      runway: {
-        configured: Boolean(process.env.RUNWAYML_API_SECRET),
-        avatarConfigured: Boolean(process.env.RUNWAY_AVATAR_ID),
-        monthlyBudgetCents: Number(process.env.RUNWAY_MONTHLY_BUDGET_CENTS ?? 1000),
-      },
+      runway: publicProviderStatus(),
     });
   }
   if (route === 'questions' && method === 'POST')
@@ -235,6 +237,96 @@ async function handle(req: Request, ctx: Context) {
     const clean = await sharp(bytes).rotate().png().toBuffer();
     return NextResponse.json(await saveUpload(clean, f.name.slice(0, 150), 'image/png', user.id), {
       status: 201,
+    });
+  }
+  if (route === 'runway/connect' && method === 'POST') {
+    return withProviderLock(async () => {
+      const input = z
+        .object({
+          apiKey: z.string().trim().min(16, 'Ingresa una API key válida.').max(4096),
+          avatarId: z.string().uuid().optional(),
+        })
+        .parse(await body(req, 8192));
+      try {
+        const client = runwayClient(input.apiKey);
+        const org = await client.organization.retrieve();
+        let avatarStatus: 'ready' | 'processing' | undefined;
+        if (input.avatarId) {
+          const avatar = await client.avatars.retrieve(input.avatarId);
+          avatarStatus = avatar.status === 'READY' ? 'ready' : 'processing';
+        }
+        const previous = getProviderSettings();
+        const same = previous.apiKey === input.apiKey;
+        saveProviderSettings({
+          apiKey: input.apiKey,
+          avatarId: input.avatarId ?? (same ? previous.avatarId : undefined),
+          avatarStatus: avatarStatus ?? (same ? previous.avatarStatus : undefined),
+          verifiedAt: new Date().toISOString(),
+          credits: typeof org.creditBalance === 'number' ? org.creditBalance : null,
+        });
+        return NextResponse.json({ ok: true, ...publicProviderStatus() });
+      } catch (e) {
+        throw new HttpError(400, providerError(e));
+      }
+    });
+  }
+  if (route === 'runway/avatar' && method === 'POST') {
+    return withProviderLock(async () => {
+      const settings = getProviderSettings();
+      if (!settings.apiKey) throw new HttpError(400, 'Conecta primero tu API key.');
+      if (settings.avatarId) return NextResponse.json({ ok: true, ...publicProviderStatus() });
+      if (['creating', 'uncertain'].includes(settings.avatarStatus ?? ''))
+        throw new HttpError(
+          409,
+          'Revisa el avatar en Runway y conecta su ID para evitar crearlo dos veces.',
+        );
+      saveProviderSettings({ ...settings, avatarStatus: 'creating' });
+      try {
+        const bytes = await sharp('public/brand/mascot.webp')
+          .resize({ width: 1280, withoutEnlargement: true })
+          .png()
+          .toBuffer();
+        const avatar = await runwayClient(settings.apiKey).avatars.create({
+          name: 'Dino · Ingresa PE',
+          personality:
+            'Eres el dinosaurio educativo de Ingresa PE. Explica a postulantes de la UNSA en español peruano, con claridad y gestos naturales.',
+          referenceImage: `data:image/png;base64,${bytes.toString('base64')}`,
+          voice: { type: 'runway-live-preset', presetId: 'adrian' },
+          imageProcessing: 'optimize',
+        });
+        saveProviderSettings({
+          ...settings,
+          avatarId: avatar.id,
+          avatarStatus: avatar.status === 'READY' ? 'ready' : 'processing',
+        });
+        return NextResponse.json({ ok: true, ...publicProviderStatus() });
+      } catch (e) {
+        saveProviderSettings({ ...settings, avatarStatus: 'uncertain' });
+        throw new HttpError(400, providerError(e));
+      }
+    });
+  }
+  if (route === 'runway/avatar/status' && method === 'POST') {
+    return withProviderLock(async () => {
+      const settings = getProviderSettings();
+      if (!settings.avatarId)
+        throw new HttpError(400, 'Prepara primero el dinosaurio o conecta un avatar existente.');
+      try {
+        const avatar = await runwayClient(settings.apiKey).avatars.retrieve(settings.avatarId);
+        if (avatar.status === 'FAILED')
+          throw new HttpError(
+            400,
+            'Runway no pudo preparar este avatar. Revisa su imagen en el portal.',
+          );
+        saveProviderSettings({
+          ...settings,
+          avatarStatus: avatar.status === 'READY' ? 'ready' : 'processing',
+        });
+        return NextResponse.json({ ok: true, ...publicProviderStatus() });
+      } catch (e) {
+        if (e instanceof HttpError) throw e;
+        throw new HttpError(400, providerError(e));
+      }
     });
   }
   if (route === 'runway/check' && method === 'POST') {

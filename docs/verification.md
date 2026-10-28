@@ -5,13 +5,13 @@ Fecha: 2026-10-28. Entorno local Linux, Node 26.11.1 y PostgreSQL 17 en Docker. 
 ## Evidencia obtenida
 
 - TypeScript estricto: `npm run typecheck`, sin errores.
-- Dominio: 12 pruebas unitarias aprobadas (validación y políticas de solicitudes).
+- Dominio: 16 pruebas unitarias aprobadas (validación y políticas de solicitudes).
 - Base real aislada: 11 pruebas aprobadas con `npm run test:db`; cubren normalización, rollback, idempotencia concurrente, versiones, presupuesto simultáneo, incertidumbre y recuperación del proveedor.
 - Build Next.js de producción: completado.
 - Auditoría npm: sin vulnerabilidades después de fijar Zod transitorio a la versión parcheada mediante overrides.
-- Imagen Docker: build completado. Runtime comprobado en Node 24.22.1: web y worker saludables, login autenticado y un MP4 generado dentro del contenedor, con descarga privada HTTP 206.
+- Imagen Docker de la entrega base 0.1: build completado. Runtime comprobado en Node 24.22.1: web y worker saludables, login autenticado y un MP4 generado dentro del contenedor, con descarga privada HTTP 206.
 - Producción real de medios locales: PNG y dos MP4 completados en la instalación de prueba. Esto es composición local, no generación real del proveedor.
-- E2E de navegador: 2 pruebas aprobadas. Flujo completo de medios y regresión para acceder a los controles de los 25 trabajos de un lote.
+- E2E de navegador: 4 pruebas aprobadas. Flujo guiado, selección conservada al volver de Configuración, credenciales protegidas, producción local y controles de los 25 trabajos de un lote.
 
 ## Revisión independiente
 
@@ -25,11 +25,17 @@ También se sustituyó el healthcheck HTTP heredado del worker por uno que compr
 
 Se verificó por separado el montaje de un clip local con audio sintético: el MP4 resultante contiene video H.264 de 720 × 1280 y audio AAC. Esta prueba verifica que el montaje conserva audio; no es una prueba de Runway.
 
+## Revisión del rediseño 0.2
+
+Revisión independiente en modo lectura. Se corrigió una carrera entre cambio de clave y operaciones de avatar; todas las mutaciones de configuración, incluida la CLI, comparten un advisory lock de PostgreSQL. Las solicitudes usan la clave capturada dentro del lock. El revisor verificó las correcciones sin hallazgos importantes pendientes.
+
+Las pruebas de base usan además un almacenamiento temporal aislado para que la cuenta configurada en la instalación no altere las políticas bajo prueba.
+
 ## Runway
 
-No hay `RUNWAYML_API_SECRET` ni `RUNWAY_AVATAR_ID` configurados en el entorno. `npm run runway:check` informa PENDIENTE y termina con código 2. La API pública consultada sin credenciales responde HTTP 401, como corresponde.
+Conexión autenticada real verificada mediante el SDK oficial el 2026-10-28. La clave creada desde la sesión autorizada de Brave se guarda en la configuración privada, fuera de Git. Saldo de API confirmado: **0 créditos**. No se compraron créditos ni se creó un avatar con costo.
 
-**No se generó ni se evaluó un video real de Runway.** La integración usa el SDK oficial tipado y pruebas de su manejo de errores, pero la calidad del dinosaurio y su voz deben verificarse con una cuenta con saldo. No se gastaron créditos.
+**No se generó ni se evaluó un video real de Runway.** Para terminar esa validación se necesita recargar el saldo de API y preparar el avatar. Los créditos web son independientes. La UI permite conectar la clave, preparar el dinosaurio y consultar su estado.
 
 Las pruebas con proveedor simulado se limitan a situaciones de fallo/reanudación: no se presentan como evidencia de generación real. Los archivos de demostración local llevan etiqueta visible.
 
