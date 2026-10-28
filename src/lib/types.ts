@@ -1,0 +1,51 @@
+export type Choice = { label: string; text: string; correct: boolean };
+export type Area = { id: number; slug: string; name: string; color: string };
+export type Question = {
+  id: string;
+  version_id: string;
+  statement: string;
+  explanation: string;
+  approved: boolean;
+  difficulty: string;
+  course_id: number;
+  course: string;
+  topic: string;
+  source: string;
+  areas: Area[];
+  choices: Choice[];
+  created_at: string;
+};
+export type Template = {
+  id: number;
+  version_id: number;
+  name: string;
+  description: string;
+  kind: 'video' | 'image' | 'carousel';
+  accent: string;
+  duration_seconds: number;
+  version: number;
+};
+export type Job = {
+  id: string;
+  batch_id: string;
+  batch_name: string;
+  statement: string;
+  template_name: string;
+  kind: string;
+  provider: 'demo' | 'runway';
+  status: string;
+  estimated_cost_cents: number;
+  output_asset_id: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  remote_task_id: string | null;
+  areas: Area[];
+};
+export type Asset = {
+  id: string;
+  original_name: string;
+  mime_type: string;
+  byte_size: number;
+  created_at: string;
+};

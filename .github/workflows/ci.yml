@@ -1,0 +1,56 @@
+name: Studio checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: ingresape_studio
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:ci-only-password@localhost:5432/ingresape_studio
+      ADMIN_EMAIL: ci@ingresa.pe
+      ADMIN_PASSWORD: ci-only-owner-password
+      APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run setup
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:db
+      - run: npm run db:migrate && npm run db:seed
+      - run: npm run build
+      - run: npx playwright install --with-deps --no-shell chromium
+      - name: End-to-end with actual media rendering
+        run: |
+          npm start > /tmp/studio-web.log 2>&1 &
+          npm run worker > /tmp/studio-worker.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/login >/dev/null; then break; fi
+            sleep 2
+          done
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: studio-test-results
+          path: |
+            test-results
+            /tmp/studio-web.log
+            /tmp/studio-worker.log

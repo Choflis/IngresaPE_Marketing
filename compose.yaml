@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ingresape_studio
+      POSTGRES_USER: studio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ejecuta npm run setup}
+    ports: ['127.0.0.1:5434:5432']
+    volumes: ['postgres_data:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U studio -d ingresape_studio']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  web:
+    profiles: ['app']
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://studio:${POSTGRES_PASSWORD}@db:5432/ingresape_studio
+      STORAGE_DIR: /app/storage
+      NODE_ENV: production
+    ports: ['127.0.0.1:3000:3000']
+    depends_on:
+      db: { condition: service_healthy }
+    volumes: ['media_data:/app/storage']
+    command: ['sh', '-c', 'npm run db:migrate && npm run db:seed && npm start']
+    restart: unless-stopped
+  worker:
+    profiles: ['app']
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://studio:${POSTGRES_PASSWORD}@db:5432/ingresape_studio
+      STORAGE_DIR: /app/storage
+      NODE_ENV: production
+    depends_on:
+      web: { condition: service_healthy }
+    volumes: ['media_data:/app/storage']
+    command: ['sh', '-c', 'npm run db:migrate && npm run worker']
+    shm_size: 1gb
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  media_data:
