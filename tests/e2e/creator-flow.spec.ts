@@ -53,17 +53,17 @@ test('conectar un proveedor no descarta el lote en preparación', async ({ page 
   await page.getByRole('button', { name: 'Revisar contenido' }).click();
   await page.getByRole('button', { name: 'Preparar producción' }).click();
   await page.getByRole('button', { name: 'Configuración', exact: true }).click();
-  await expect(page.getByLabel('API key de Runway')).toHaveAttribute('type', 'password');
-  await expect(page.getByLabel('API key de Runway')).toHaveValue('');
+  await expect(page.getByLabel('API key de fal.ai')).toHaveAttribute('type', 'password');
+  await expect(page.getByLabel('API key de fal.ai')).toHaveValue('');
   const before = await (await page.request.get('/api/studio')).json();
-  const invalid = await page.request.post('/api/runway/connect', {
+  const invalid = await page.request.post('/api/fal/connect', {
     headers: { Origin: process.env.APP_URL ?? 'http://localhost:3000' },
     data: { apiKey: 'x' },
   });
   expect(invalid.status()).toBe(400);
   const after = await (await page.request.get('/api/studio')).json();
-  expect(after.runway.configured).toBe(before.runway.configured);
-  expect(Object.keys(after.runway)).not.toContain('apiKey');
+  expect(after.fal.configured).toBe(before.fal.configured);
+  expect(Object.keys(after.fal)).not.toContain('apiKey');
   await page.getByRole('button', { name: 'Crear contenido', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'Todo listo para producir' })).toBeVisible();
   await page.getByRole('button', { name: 'Atrás', exact: true }).click();
@@ -72,7 +72,7 @@ test('conectar un proveedor no descarta el lote en preparación', async ({ page 
   await expect(page.locator('.question-option[aria-pressed=true]')).toHaveCount(1);
 });
 
-test('explica el bloqueo de Runway y permite producir un video local desde el creador', async ({
+test('explica el bloqueo de fal.ai y permite producir un video local desde el creador', async ({
   page,
 }) => {
   await page.request.post('/api/login', {
@@ -82,7 +82,7 @@ test('explica el bloqueo de Runway y permite producir un video local desde el cr
   await page.route('**/api/studio', async (route) => {
     const response = await route.fetch();
     const data = await response.json();
-    data.runway = { ...data.runway, configured: true, avatarConfigured: false, credits: 0 };
+    data.fal = { ...data.fal, configured: false };
     await route.fulfill({ response, json: data });
   });
   await page.goto('/#create');
@@ -92,7 +92,7 @@ test('explica el bloqueo de Runway y permite producir un video local desde el cr
   await page.getByRole('button', { name: 'Revisar contenido' }).click();
   await page.getByRole('button', { name: 'Preparar producción' }).click();
   await expect(
-    page.getByText('Runway conectado: faltan saldo de API y preparar el dinosaurio.', {
+    page.getByText('Conecta tu API key de fal.ai desde Configuración.', {
       exact: true,
     }),
   ).toBeVisible();

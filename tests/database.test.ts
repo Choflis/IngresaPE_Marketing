@@ -1,10 +1,21 @@
 import { beforeAll, beforeEach, afterAll, describe, it, expect, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-vi.mock('../src/server/runway', () => ({
-  submitAvatar: vi.fn(),
-  pollRunway: vi.fn(),
-  providerError: () => 'No se pudo confirmar Runway.',
+import path from 'node:path';
+import { writeFile } from 'node:fs/promises';
+import { buildFalGeneration, FAL_TEXT_MODEL } from '../src/lib/fal-contract';
+vi.mock('../src/server/fal', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/server/fal')>()),
+  cancelFal: vi.fn(),
+  submitFal: vi.fn(),
+  pollFal: vi.fn(),
+  providerError: () => 'No se pudo confirmar fal.ai.',
+}));
+vi.mock('../src/server/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/server/storage')>()),
+  downloadProviderOutput: vi.fn(async (_url: string, target: string) => {
+    await writeFile(target, 'mock downloaded clip');
+  }),
 }));
 const enabled = Boolean(process.env.TEST_DATABASE_URL);
 describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () => {
@@ -22,7 +33,10 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
     production = await import('../src/server/production');
   });
   beforeEach(async () => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    delete process.env.FAL_KEY;
+    delete process.env.FAL_MODEL;
+    delete process.env.FAL_MONTHLY_BUDGET_CENTS;
     await db.query('TRUNCATE users,areas,courses,sources,templates RESTART IDENTITY CASCADE');
     owner = (
       await db.query(
@@ -63,6 +77,117 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
       approved,
     });
   }
+  it('conserva la composición y congela el modelo y 450 cuadros en cada trabajo fal', async () => {
+    const t = await catalog.createTemplate({
+      name: 'Las fijas personalizada',
+      description: 'Formato escolar',
+      kind: 'video',
+      accent: '#C80727',
+      durationSeconds: 30,
+      composition: 'las-fijas',
+    });
+    const template = (await catalog.getTemplates()).find((v) => v.id === t.id)!;
+    expect(template.composition).toBe('las-fijas');
+    process.env.FAL_KEY = 'test-key-never-sent';
+    process.env.FAL_MODEL = 'fal-ai/longcat-video/distilled/text-to-video/480p';
+    try {
+      const q = await question();
+      const b = await production.createBatch(
+        { questionIds: [q.id], templateVersionId: template.version_id, provider: 'fal' },
+        owner,
+        randomUUID(),
+      );
+      const [job] = await db.query(
+        'SELECT generation_config,estimated_cost_cents FROM video_jobs WHERE batch_id=$1',
+        [b.id],
+      );
+      expect(job.generation_config).toMatchObject({
+        model: 'fal-ai/longcat-video/distilled/text-to-video/480p',
+        input: { num_frames: 450, fps: 15 },
+      });
+      expect(job.estimated_cost_cents).toBe(15);
+      process.env.FAL_MODEL = 'fal-ai/longcat-video/distilled/image-to-video/480p';
+      expect(
+        (await db.query('SELECT generation_config FROM video_jobs WHERE batch_id=$1', [b.id]))[0]
+          .generation_config.model,
+      ).toContain('text-to-video');
+    } finally {
+      delete process.env.FAL_KEY;
+      delete process.env.FAL_MODEL;
+    }
+  });
+  it('no puede enviar nuevos lotes a un proveedor retirado', async () => {
+    const q = await question();
+    await expect(
+      production.createBatch(
+        { questionIds: [q.id], templateVersionId: templateId, provider: 'runway' },
+        owner,
+        randomUUID(),
+      ),
+    ).rejects.toThrow();
+    expect(await db.query('SELECT * FROM batches')).toHaveLength(0);
+  });
+  it('envía una sola generación y reutiliza el resultado descargado al recuperar', async () => {
+    const q = await question();
+    const b = await production.createBatch(
+      { questionIds: [q.id], templateVersionId: templateId, provider: 'demo' },
+      owner,
+      randomUUID(),
+    );
+    const input = buildFalGeneration({ seconds: 15, model: FAL_TEXT_MODEL, seed: 5 });
+    const [job] = await db.query(
+      "UPDATE video_jobs SET provider='fal',generation_config=$2 WHERE batch_id=$1 RETURNING id",
+      [b.id, input],
+    );
+    const gateway = await import('../src/server/fal');
+    const storage = await import('../src/server/storage');
+    vi.mocked(gateway.submitFal).mockResolvedValue({ id: 'existing-fal-request' });
+    vi.mocked(gateway.pollFal).mockResolvedValue({
+      status: 'SUCCEEDED',
+      output: ['https://v3b.fal.media/files/video.mp4'],
+    });
+    vi.mocked(storage.downloadProviderOutput).mockImplementation(async (_url, target) => {
+      await writeFile(target, 'mock downloaded clip');
+    });
+    const { providerClip } = await import('../src/server/provider-job');
+    const dir = await storage.jobDirectory(job.id);
+    expect(await providerClip(job.id, input, dir)).toBe(path.join(dir, 'provider.mp4'));
+    expect(await providerClip(job.id, input, dir)).toBe(path.join(dir, 'provider.mp4'));
+    expect(gateway.submitFal).toHaveBeenCalledExactlyOnceWith(input);
+    expect(gateway.pollFal).toHaveBeenCalledExactlyOnceWith('existing-fal-request');
+    expect(storage.downloadProviderOutput).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        await db.query('SELECT state,remote_task_id FROM provider_requests WHERE job_id=$1', [
+          job.id,
+        ])
+      )[0],
+    ).toMatchObject({ state: 'succeeded', remote_task_id: 'existing-fal-request' });
+  });
+  it('un rechazo HTTP402 no se reenvía como nueva generación', async () => {
+    const q = await question();
+    const b = await production.createBatch(
+      { questionIds: [q.id], templateVersionId: templateId, provider: 'demo' },
+      owner,
+      randomUUID(),
+    );
+    const input = buildFalGeneration({ seconds: 15, model: FAL_TEXT_MODEL, seed: 5 });
+    const [job] = await db.query(
+      "UPDATE video_jobs SET provider='fal',generation_config=$2 WHERE batch_id=$1 RETURNING id",
+      [b.id, input],
+    );
+    const gateway = await import('../src/server/fal');
+    vi.mocked(gateway.submitFal).mockRejectedValue(new gateway.FalApiError(402));
+    const { providerClip } = await import('../src/server/provider-job');
+    const { jobDirectory } = await import('../src/server/storage');
+    const dir = await jobDirectory(job.id);
+    expect(await providerClip(job.id, input, dir)).toBeNull();
+    expect(await providerClip(job.id, input, dir)).toBeNull();
+    expect(gateway.submitFal).toHaveBeenCalledTimes(1);
+    expect((await db.query('SELECT status FROM video_jobs WHERE id=$1', [job.id]))[0].status).toBe(
+      'failed',
+    );
+  });
   it('normaliza temas compartidos sin repetirlos', async () => {
     await question();
     await question();
@@ -128,20 +253,20 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
   });
   it('serializa reservas para no superar el presupuesto entre lotes', async () => {
     const q = await question();
-    process.env.RUNWAYML_API_SECRET = 'test-key-never-sent';
-    process.env.RUNWAY_AVATAR_ID = randomUUID();
+    process.env.FAL_KEY = 'test-key-never-sent';
+    process.env.FAL_MODEL = 'fal-ai/longcat-video/distilled/text-to-video/480p';
     const data = await catalog.getQuestions();
-    const { estimateCostCents, narrationFor } = await import('../src/lib/validation');
-    process.env.RUNWAY_MONTHLY_BUDGET_CENTS = String(estimateCostCents(narrationFor(data[0])));
-    const input = { questionIds: [q.id], templateVersionId: templateId, provider: 'runway' };
+    const { estimateFalCostCents } = await import('../src/lib/fal-contract');
+    process.env.FAL_MONTHLY_BUDGET_CENTS = String(estimateFalCostCents(15));
+    const input = { questionIds: [q.id], templateVersionId: templateId, provider: 'fal' };
     const r = await Promise.allSettled([
       production.createBatch(input, owner, randomUUID()),
       production.createBatch(input, owner, randomUUID()),
     ]);
     expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
     expect(r.filter((x) => x.status === 'rejected')).toHaveLength(1);
-    delete process.env.RUNWAYML_API_SECRET;
-    delete process.env.RUNWAY_AVATAR_ID;
+    delete process.env.FAL_KEY;
+    delete process.env.FAL_MODEL;
   });
   it('un timeout de envío requiere revisión y nunca reenvía la generación', async () => {
     const q = await question();
@@ -151,19 +276,19 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
       randomUUID(),
     );
     const [j] = await db.query(
-      "UPDATE video_jobs SET provider='runway' WHERE batch_id=$1 RETURNING *",
-      [b.id],
+      "UPDATE video_jobs SET provider='fal',generation_config=$2 WHERE batch_id=$1 RETURNING *",
+      [b.id, buildFalGeneration({ seconds: 15, model: FAL_TEXT_MODEL, seed: 1 })],
     );
-    const gateway = await import('../src/server/runway');
-    vi.mocked(gateway.submitAvatar).mockRejectedValue(new Error('timeout'));
+    const gateway = await import('../src/server/fal');
+    vi.mocked(gateway.submitFal).mockRejectedValue(new Error('timeout'));
     const { processJob } = await import('../src/server/process-job');
     await processJob(j.id);
     expect((await db.query('SELECT status FROM video_jobs WHERE id=$1', [j.id]))[0].status).toBe(
       'needs_attention',
     );
-    expect(vi.mocked(gateway.submitAvatar)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(gateway.submitFal)).toHaveBeenCalledTimes(1);
     await processJob(j.id);
-    expect(vi.mocked(gateway.submitAvatar)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(gateway.submitFal)).toHaveBeenCalledTimes(1);
   });
   it('reintenta una consulta transitoria sin crear otro video', async () => {
     const q = await question();
@@ -173,21 +298,21 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
       randomUUID(),
     );
     const [j] = await db.query(
-      "UPDATE video_jobs SET provider='runway' WHERE batch_id=$1 RETURNING *",
-      [b.id],
+      "UPDATE video_jobs SET provider='fal',generation_config=$2 WHERE batch_id=$1 RETURNING *",
+      [b.id, buildFalGeneration({ seconds: 15, model: FAL_TEXT_MODEL, seed: 1 })],
     );
     await db.query(
       "INSERT INTO provider_requests(job_id,state,remote_task_id) VALUES($1,'submitted',$2)",
       [j.id, randomUUID()],
     );
-    const gateway = await import('../src/server/runway');
-    vi.mocked(gateway.pollRunway).mockRejectedValue(new Error('network'));
+    const gateway = await import('../src/server/fal');
+    vi.mocked(gateway.pollFal).mockRejectedValue(new Error('network'));
     const { processJob } = await import('../src/server/process-job');
     await expect(processJob(j.id)).rejects.toThrow(/reintentará/);
     expect((await db.query('SELECT status FROM video_jobs WHERE id=$1', [j.id]))[0].status).toBe(
       'queued',
     );
-    expect(vi.mocked(gateway.submitAvatar)).not.toHaveBeenCalled();
+    expect(vi.mocked(gateway.submitFal)).not.toHaveBeenCalled();
   });
   it('mantiene trabajos de más de 60 segundos y recupera un heartbeat perdido', async () => {
     const { PgBoss } = await import('pg-boss');
@@ -229,8 +354,8 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
       randomUUID(),
     );
     const [j] = await db.query(
-      "UPDATE video_jobs SET provider='runway' WHERE batch_id=$1 RETURNING *",
-      [b.id],
+      "UPDATE video_jobs SET provider='fal',generation_config=$2 WHERE batch_id=$1 RETURNING *",
+      [b.id, buildFalGeneration({ seconds: 15, model: FAL_TEXT_MODEL, seed: 1 })],
     );
     await db.query("INSERT INTO provider_requests(job_id,state) VALUES($1,'submitting')", [j.id]);
     const { processJob } = await import('../src/server/process-job');
@@ -238,7 +363,7 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
     expect((await db.query('SELECT status FROM video_jobs WHERE id=$1', [j.id]))[0].status).toBe(
       'needs_attention',
     );
-    const gateway = await import('../src/server/runway');
-    expect(vi.mocked(gateway.submitAvatar)).not.toHaveBeenCalled();
+    const gateway = await import('../src/server/fal');
+    expect(vi.mocked(gateway.submitFal)).not.toHaveBeenCalled();
   });
 });

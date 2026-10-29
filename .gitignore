@@ -8,3 +8,6 @@ playwright-report/
 test-results/
 coverage/
 *.tsbuildinfo
+
+# Original sample video stays local.
+/ejemplo_Video/

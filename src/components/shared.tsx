@@ -23,17 +23,19 @@ export type StudioData = {
   jobs: Job[];
   assets: Asset[];
   workerOnline: boolean;
+  referenceVideoAvailable: boolean;
   stats: { total_jobs: number; completed: number; active: number; reserved_cents: number };
-  runway: {
+  fal: {
     configured: boolean;
-    avatarStatus?: string;
-    verifiedAt?: string | null;
-    credits?: number | null;
-    avatarConfigured: boolean;
+    model: import('@/lib/fal-contract').FalModel;
+    resolution: '480p';
+    fps: number;
+    savedAt?: string | null;
     monthlyBudgetCents: number;
   };
 };
-export type Screen = 'home' | 'create' | 'questions' | 'templates' | 'library' | 'settings';
+export type Screen =
+  'home' | 'create' | 'questions' | 'templates' | 'library' | 'settings' | 'voices' | 'format';
 export async function api(path: string, data?: unknown, headers: Record<string, string> = {}) {
   const r = await fetch(`/api/${path}`, {
     method: data === undefined ? 'GET' : 'POST',
@@ -58,7 +60,7 @@ const labels: Record<string, string> = {
   rendering: 'Montando',
   completed: 'Completado',
   failed: 'Error',
-  needs_attention: 'Revisar Runway',
+  needs_attention: 'Requiere revisión',
   cancelled: 'Cancelado',
 };
 export function Status({ status }: { status: string }) {
@@ -169,8 +171,12 @@ export function JobsTable({
                   <div>
                     <strong>{j.statement}</strong>
                     <small>
-                      {j.provider === 'demo' ? 'Producción local' : 'Runway'} ·{' '}
-                      {new Date(j.created_at).toLocaleDateString('es-PE')}
+                      {j.provider === 'demo'
+                        ? 'Producción local'
+                        : j.provider === 'fal'
+                          ? 'fal.ai'
+                          : 'Proveedor anterior'}{' '}
+                      · {new Date(j.created_at).toLocaleDateString('es-PE')}
                     </small>
                     {j.error_message && <span className="row-error">{j.error_message}</span>}
                   </div>
@@ -211,7 +217,7 @@ export function JobsTable({
                       </a>
                     </>
                   )}
-                  {j.status === 'failed' && (
+                  {j.status === 'failed' && j.provider !== 'runway' && (
                     <button
                       className="icon-button"
                       title="Reintentar sin nueva generación"
@@ -229,7 +235,7 @@ export function JobsTable({
                       <X size={16} />
                     </button>
                   )}
-                  {j.status === 'needs_attention' && (
+                  {j.status === 'needs_attention' && j.provider === 'fal' && (
                     <button
                       className="button subtle small"
                       onClick={() => onAction(j.id, 'reconcile')}

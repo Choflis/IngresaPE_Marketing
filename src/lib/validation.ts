@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { assertValidChoices, compositionKeys } from './video-format';
 export const questionInput = z
   .object({
     statement: z.string().trim().min(10).max(700),
@@ -25,13 +26,11 @@ export const questionInput = z
     source: z.string().trim().max(200).default('Contenido propio de práctica'),
   })
   .superRefine((v, ctx) => {
-    if (v.choices.filter((c) => c.correct).length !== 1)
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Debe existir exactamente una alternativa correcta.',
-      });
-    if (new Set(v.choices.map((c) => c.label)).size !== v.choices.length)
-      ctx.addIssue({ code: 'custom', message: 'Las letras de alternativas deben ser únicas.' });
+    try {
+      assertValidChoices(v.choices);
+    } catch (e) {
+      ctx.addIssue({ code: 'custom', message: (e as Error).message });
+    }
   });
 export const batchInput = z.object({
   questionIds: z
@@ -40,7 +39,7 @@ export const batchInput = z.object({
     .max(25)
     .transform((v) => [...new Set(v)]),
   templateVersionId: z.number().int().positive(),
-  provider: z.enum(['demo', 'runway']),
+  provider: z.enum(['demo', 'fal']),
   name: z.string().trim().max(100).default('Nueva producción'),
 });
 export const templateInput = z.object({
@@ -49,21 +48,8 @@ export const templateInput = z.object({
   kind: z.enum(['video', 'image', 'carousel']),
   accent: z.string().regex(/^#[a-fA-F0-9]{6}$/),
   durationSeconds: z.number().int().min(6).max(60),
+  composition: z.enum(compositionKeys).optional(),
 });
-// Conservative reservation, not an invoice: TTS + estimated speaking time + margin.
-export function estimateCostCents(text: string) {
-  return Math.ceil(
-    (Math.ceil(text.length / 50) + Math.ceil(Math.max(6, text.length / 9) / 3)) * 1.5 + 2,
-  );
-}
-export function narrationFor(q: {
-  statement: string;
-  explanation: string;
-  choices: { label: string; text: string; correct: boolean }[];
-}) {
-  const c = q.choices.find((c) => c.correct)!;
-  return `${q.statement} La respuesta correcta es la alternativa ${c.label}: ${c.text}. ${q.explanation}`;
-}
 export function isRetryableStatus(status: number) {
   return status === 429 || status >= 500;
 }

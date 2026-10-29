@@ -24,6 +24,7 @@ export type Template = {
   accent: string;
   duration_seconds: number;
   version: number;
+  composition: import('./video-format').CompositionKey;
 };
 export type Job = {
   id: string;
@@ -32,7 +33,7 @@ export type Job = {
   statement: string;
   template_name: string;
   kind: string;
-  provider: 'demo' | 'runway';
+  provider: 'demo' | 'fal' | 'runway';
   status: string;
   estimated_cost_cents: number;
   output_asset_id: string | null;

@@ -28,6 +28,8 @@ Catálogo compartido para un único propietario. `video_jobs` conserva el nombre
 
 `npm run db:migrate` aplica una sola vez cada archivo de `db/migrations`, en orden y bajo lock transaccional. Los errores hacen rollback. No hay sincronización destructiva automática del esquema.
 
+La migración `002_formats_and_voices.sql` añade composiciones y Las fijas. Sus tablas de voces se conservan como datos históricos, sin API activa. La migración `003_fal_provider.sql` incorpora `fal` y el snapshot técnico `generation_config`; bloquea los trabajos pendientes del proveedor retirado para evitar ejecutarlos accidentalmente. Conserva sus archivos, IDs y estados de solicitud.
+
 ## Respaldos
 
 La base y los medios forman un conjunto. Guarda ambos; un dump SQL sin el volumen de medios no contiene los MP4/PNG.

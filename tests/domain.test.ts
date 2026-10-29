@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  questionInput,
-  batchInput,
-  estimateCostCents,
-  assertRenderable,
-} from '../src/lib/validation';
+import { questionInput, batchInput, assertRenderable } from '../src/lib/validation';
 const valid = {
   statement: '¿Cuánto es dos más dos?',
   explanation: 'Dos más dos es cuatro.',
@@ -47,9 +42,5 @@ describe('contrato de contenido', () => {
         provider: 'demo',
       }),
     ).toThrow();
-  });
-  it('estima presupuesto según el texto, nunca cero para Runway', () => {
-    expect(estimateCostCents('Hola')).toBeGreaterThan(0);
-    expect(estimateCostCents('a'.repeat(1000))).toBeGreaterThan(estimateCostCents('Hola'));
   });
 });

@@ -7,16 +7,16 @@ describe('protección frente a doble generación pagada', () => {
       expect(canSubmitProvider({ state })).toBe(false);
   });
   it('rechaza reintento automático de solicitud ambigua', () => {
-    expect(canRetryJob('runway', { state: 'uncertain', remote_task_id: null })).toBe(false);
+    expect(canRetryJob('fal', { state: 'uncertain', remote_task_id: null })).toBe(false);
   });
   it('permite recuperar el polling de una tarea conocida', () => {
-    expect(canRetryJob('runway', { state: 'submitted', remote_task_id: 'known' })).toBe(true);
+    expect(canRetryJob('fal', { state: 'submitted', remote_task_id: 'known' })).toBe(true);
   });
   it('rechaza reintentar una generación remota fallida cobrable', () => {
-    expect(canRetryJob('runway', { state: 'failed', remote_task_id: 'known' })).toBe(false);
+    expect(canRetryJob('fal', { state: 'failed', remote_task_id: 'known' })).toBe(false);
   });
   it('permite reintentar montaje sin otro gasto', () => {
-    expect(canRetryJob('runway', { state: 'succeeded', remote_task_id: 'known' })).toBe(true);
+    expect(canRetryJob('fal', { state: 'succeeded', remote_task_id: 'known' })).toBe(true);
     expect(canRetryJob('demo', null)).toBe(true);
   });
 });

@@ -15,15 +15,18 @@
 
 ## Qué puedes hacer
 
+- **Catálogo de formatos:** el inicio reúne videos, imágenes y carruseles. Puedes abrir cada formato y entrar al creador con él seleccionado. Las copias idénticas se agrupan visualmente, conservando sus versiones y trabajos.
+- **Las fijas:** formato propio de 30 segundos basado en el ejemplo de la marca; presentación, lectura con cuenta regresiva, clave revisada y explicación, y cierre. El texto y las alternativas se componen con código, sin pedir a la IA que dibuje respuestas.
+- **Voz pendiente:** escuchar y descargar el audio original de referencia. Por ahora las producciones no incluyen narración.
 - **Banco de preguntas:** organizar por Biomédicas, Ingenierías y Sociales, curso, tema y dificultad; guardar alternativas y explicación; aprobar antes de producir.
 - **Formatos reutilizables:** Dino responde, reto con cuenta regresiva, pregunta del día y carrusel. Crear variantes de color y duración de demostración.
 - **Producción por lotes:** hasta 25 preguntas por lote, cola persistente y concurrencia configurable.
-- **Dinosaurio animado con Runway:** generar actuación y voz para cada respuesta usando un avatar propio; conservar pregunta, marca y diseño con Remotion.
+- **Dinosaurio animado con fal.ai:** generar la animación con LongCat Video Distilled 480p, desde imagen o texto; conservar pregunta, marca y diseño con Remotion.
 - **Demostración local:** producir MP4 con movimiento sencillo de la mascota, sin voz ni sincronización labial, rotulado como demostración. Permite probar todo el circuito sin pagar una API.
 - **Imágenes y carruseles:** PNG de 1080 × 1350; tres archivos por carrusel, compuestos localmente.
 - **Biblioteca privada:** reproducir, subir imágenes y descargar medios mediante sesión.
 - **Guion asistido:** preparar un borrador desde una explicación aprobada, con Gemini opcional.
-- **Control:** estados de producción, cancelación, recuperación, protección ante duplicados y presupuesto estimado mensual para Runway.
+- **Control:** estados de producción, cancelación, recuperación, protección ante duplicados y presupuesto estimado mensual para fal.ai.
 
 El catálogo inicial incluye **nueve preguntas originales de muestra**, tres por área. No son preguntas oficiales ni predicciones de un examen.
 
@@ -62,6 +65,22 @@ Si necesitas cambiar la contraseña: modifica `ADMIN_PASSWORD` en `.env` y ejecu
 4. En **Producción**, selecciona **Video local** para crear un MP4 sin API, o genera el PNG/carrusel. Verás el resumen antes de enviar.
 5. Sigue el lote en Vista general y descarga desde **Biblioteca**. Puedes retroceder o ir a Configuración sin perder la selección mientras mantengas abierta la página.
 
+Para revisar el formato de referencia con un MP4 real de 30 segundos, sin generación ni costo de API:
+
+```bash
+npm run preview:las-fijas
+```
+
+El comando guarda **Las fijas · 30 s · diseño sin voz.mp4** en Biblioteca y verifica su duración con FFprobe. Repetirlo actualiza la misma muestra. Es una vista del diseño con la imagen de referencia, no una generación de fal.ai.
+
+En **Las fijas**, la pregunta aparece de 2 a 10 segundos; la clave y la explicación, de 10 a 27, y el cierre ocupa los últimos 3 segundos. La legibilidad se valida antes de producir, incluyendo la altura estimada de las alternativas. La IA solo anima al personaje; Remotion dibuja los textos y marca la respuesta del banco aprobado.
+
+### Voz de referencia
+
+La sección **Voces** conserva el audio del ejemplo para comparar timbre y ritmo cuando se integre una voz. LongCat no incluye narración ni sincronización labial en este flujo. No se ha elegido un proveedor de voz.
+
+El video original en `ejemplo_Video/` se mantiene local y está excluido de Git. Si existe, puedes reproducirlo desde el detalle de Las fijas. En otra instalación sin ese archivo, la plantilla funciona normalmente y no muestra ese control. La imagen del personaje y el audio de referencia sí acompañan al proyecto.
+
 ![Creador académico por pasos](docs/screenshots/academic-creator.png)
 
 ![Revisión de la producción](docs/screenshots/academic-review.png)
@@ -85,54 +104,43 @@ docker compose --profile app stop
 
 No ejecutes simultáneamente la web local y la web Docker sobre el puerto 3000. Evita duplicar workers sin intención: la concurrencia se suma entre procesos.
 
-## Conectar y probar Runway
+## Conectar fal.ai
 
-Necesitas una API key del **portal de desarrolladores de Runway con saldo**. Los créditos de la app web y los de API son independientes. Consulta las [condiciones y precios del proveedor](https://docs.dev.runwayml.com/guides/pricing/).
+1. Abre **Configuración → Anima con fal.ai**.
+2. Copia una API key de tu [cuenta de fal.ai](https://fal.ai/dashboard), pégala en el campo privado y elige el modelo.
+3. **Desde imagen** usa el dinosaurio de referencia y es el predeterminado. **Desde texto** usa una descripción y puede cambiar su apariencia.
+4. Pulsa **Guardar configuración**. Guardar no genera contenido, no comprueba el saldo y no confirma permisos del proveedor. La autenticación se valida al generar.
+5. En el creador, selecciona **fal.ai · Anima tu dinosaurio**, revisa el costo y genera el lote.
 
-1. Abre **Configuración → Conecta tu aula con Runway**.
-2. Obtén una clave en [Runway Developers](https://dev.runway.com), pégala en el campo privado y pulsa **Verificar y conectar**. Se valida antes de guardar.
-3. Con saldo disponible, pulsa **Preparar dinosaurio** y después **Comprobar estado** hasta que esté listo. Si ya tienes un avatar, conecta su ID al guardar la clave.
-4. Vuelve al creador y selecciona Runway en el paso Producción. La configuración se comparte con el worker sin reiniciarlo en la versión 0.2.
+Modelos admitidos: [LongCat desde imagen](https://fal.ai/models/fal-ai/longcat-video/distilled/image-to-video/480p/api) y [LongCat desde texto](https://fal.ai/models/fal-ai/longcat-video/distilled/text-to-video/480p/api). Ambos usan 480p a 15 fps; los textos se componen localmente y el MP4 final es 720 × 1280 a 30 fps. Ampliar la salida no recupera detalle del clip original.
 
-La clave se guarda en `storage/config/runway.json`, con permisos privados y excluida de Git. Respalda ese directorio de forma privada. `.env` sigue disponible como alternativa mediante `RUNWAYML_API_SECRET` y `RUNWAY_AVATAR_ID`; el archivo guardado desde el panel tiene prioridad.
+La tarifa de referencia es **US$0.005 por segundo generado**, calculando segundos como cuadros / 15. Para 30 segundos se solicitan 450 cuadros: **US$0.15 por video**, hasta **66 videos con US$10**, sin impuestos ni regeneraciones. No es una suscripción ilimitada. Revisa la tarifa vigente antes de recargar.
 
-```bash
-npm run runway:check
-# Prueba corta pagada, solo con saldo y avatar listo:
-npm run runway:smoke
-```
+La configuración se guarda en `storage/config/fal.json` con permisos 0600, compartida por web y worker y excluida de Git. Como alternativa usa `FAL_KEY` y `FAL_MODEL` en `.env`. El archivo guardado desde el panel tiene prioridad. El modelo, prompt, duración e imagen quedan congelados en cada trabajo; cambiar la configuración afecta solo a los nuevos.
 
-**Comprobación de esta instalación:** conexión autenticada verificada el 2026-10-28; saldo de API: **0 créditos**. Falta recargar el saldo y preparar el avatar para generar el video real. No se compraron créditos.
-
-Este comando envía **una sola generación corta**, guarda el task ID y descarga el video a `storage/provider-tests/` si termina. No repitas el comando para consultar una solicitud anterior: cada ejecución genera un video nuevo. Conserva el comprobante JSON para consultar ese ID en el portal.
-
-El presupuesto mensual protege **lotes creados en el panel**; las herramientas CLI y consumos externos de tu cuenta no pasan por esa reserva. Las reservas son conservadoras y no equivalen al saldo ni a una factura. Los trabajos enviados, incluso fallidos o cancelados después del envío, conservan su reserva porque pueden tener costo.
-
-**Estado de la verificación real:** consultar [docs/verification.md](docs/verification.md). Sin credenciales con saldo no se puede afirmar que el dinosaurio haya sido generado por Runway. La demostración local siempre se identifica como tal.
-
-### Si Runway aparece deshabilitado
-
-Una clave válida conecta la cuenta; el dinosaurio hablando necesita además un avatar listo y saldo de API. El creador muestra qué requisito falta. Para producir sin esperar, elige **Video local → Generar video**: obtendrás un MP4 con movimiento de muestra, identificado como demostración y sin voz. Después se descarga desde Biblioteca.
+`FAL_MONTHLY_BUDGET_CENTS` limita las reservas mensuales del panel por propietario. No consulta el saldo real ni incluye consumos realizados directamente en fal.ai. Los trabajos enviados, incluso fallidos o cancelados, conservan su reserva porque pueden tener costo. Cancelar un trabajo no garantiza cancelar una inferencia ya iniciada ni un reembolso.
 
 ### Recuperar un envío incierto
 
-Si la conexión cae al crear una generación y no llega el task ID, el panel muestra **Revisar Runway**. Comprueba el portal y utiliza **Vincular tarea** con el ID original. El sistema continúa consultando esa generación y evita reenviarla automáticamente. Si Runway falló definitivamente, crea un lote nuevo solo cuando quieras una generación nueva.
+Si se pierde la respuesta al crear una generación, el trabajo pasa a **Requiere revisión**. Comprueba el historial de fal.ai y utiliza **Vincular tarea** con su request ID original. El worker consulta y descarga ese resultado; no repite el POST pagado. Un fallo definitivo requiere un lote nuevo si deseas otra generación.
+
+La integración anterior fue retirada. Sus trabajos y archivos históricos se conservan, pero no se ejecutan ni se envían a fal.ai. Crea un lote nuevo para producirlos con el nuevo proveedor.
 
 ## Configuración
 
-| Variable                                  | Uso                                                                         |
-| ----------------------------------------- | --------------------------------------------------------------------------- |
-| `APP_URL`                                 | Origen del panel, por defecto `http://localhost:3000`.                      |
-| `DATABASE_URL`                            | PostgreSQL de la aplicación. El puerto local de Compose es `5434`.          |
-| `POSTGRES_PASSWORD`                       | Contraseña del contenedor PostgreSQL, generada por setup.                   |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD`           | Cuenta inicial. Para cambios posteriores usa `account:reset`.               |
-| `AUTH_COOKIE_SECURE`                      | `false` para HTTP local; `true` con HTTPS.                                  |
-| `STORAGE_DIR`                             | Directorio persistente de medios.                                           |
-| `WORKER_CONCURRENCY`                      | Trabajos concurrentes por proceso, de 1 a 8; por defecto 2.                 |
-| `RENDER_CONCURRENCY`                      | Frames concurrentes por render de Remotion; por defecto 1.                  |
-| `RUNWAYML_API_SECRET`, `RUNWAY_AVATAR_ID` | Credenciales y avatar para generación real.                                 |
-| `RUNWAY_MONTHLY_BUDGET_CENTS`             | Reserva mensual máxima del panel en centavos de USD.                        |
-| `GEMINI_API_KEY`, `GEMINI_MODEL`          | Borrador de guion opcional. La generación conserva la explicación aprobada. |
+| Variable                         | Uso                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| `APP_URL`                        | Origen del panel, por defecto `http://localhost:3000`.                      |
+| `DATABASE_URL`                   | PostgreSQL de la aplicación. El puerto local de Compose es `5434`.          |
+| `POSTGRES_PASSWORD`              | Contraseña del contenedor PostgreSQL, generada por setup.                   |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`  | Cuenta inicial. Para cambios posteriores usa `account:reset`.               |
+| `AUTH_COOKIE_SECURE`             | `false` para HTTP local; `true` con HTTPS.                                  |
+| `STORAGE_DIR`                    | Directorio persistente de medios.                                           |
+| `WORKER_CONCURRENCY`             | Trabajos concurrentes por proceso, de 1 a 8; por defecto 2.                 |
+| `RENDER_CONCURRENCY`             | Frames concurrentes por render de Remotion; por defecto 1.                  |
+| `FAL_KEY`, `FAL_MODEL`           | Clave privada y modelo LongCat 480p.                                        |
+| `FAL_MONTHLY_BUDGET_CENTS`       | Reserva mensual máxima del panel en centavos de USD.                        |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Borrador de guion opcional. La generación conserva la explicación aprobada. |
 
 Para dos renders simultáneos, empieza con **4 CPU y 8 GB RAM** como orientación y mide el consumo de tu contenido. Incrementa concurrencia de forma gradual. La imagen Docker usa `shm_size: 1gb` en el worker.
 
@@ -144,7 +152,7 @@ Para acceso remoto privado, usa un túnel o VPN de tu elección. Si expones el p
 Navegador → Next.js + sesión → PostgreSQL normalizado
                                   ↓ trabajos persistentes
                               pg-boss → worker
-                                         ├─ Runway → personaje + voz
+                                         ├─ fal.ai → animación sin voz
                                          ├─ Remotion → MP4
                                          └─ Sharp → PNG / carrusel
                                               ↓
@@ -177,11 +185,13 @@ npm run test:e2e
 
 ## Alcance de esta versión
 
-Herramienta para un propietario. No publica automáticamente en redes. Los formatos son variantes de las composiciones incluidas; no hay editor libre de escenas. El avatar real y la voz requieren validar calidad con la imagen y cuenta de Runway. Los formatos cortos admiten hasta 240 caracteres de pregunta, 400 de explicación y 650 entre pregunta y alternativas, para conservar legibilidad. El listado carga hasta 1.000 preguntas y los 300 trabajos/archivos más recientes; la base y la cola conservan los demás.
+Herramienta para un propietario. No publica automáticamente en redes. Los formatos son variantes de las composiciones incluidas; no hay editor libre de escenas. La calidad de animación de fal.ai requiere comprobarse con una generación real; la voz queda pendiente. Los formatos cortos admiten hasta 240 caracteres de pregunta, 400 de explicación y 650 entre pregunta y alternativas, para conservar legibilidad. El listado carga hasta 1.000 preguntas y los 300 trabajos/archivos más recientes; la base y la cola conservan los demás.
 
-El MP4 de demostración anima la imagen de marca, **no simula una actuación real ni una voz de Runway**. Las imágenes con plantillas evitan una API visual pagada, pero consumen servidor, almacenamiento y, si se habilita, modelos externos.
+El MP4 de demostración anima la imagen de marca, **no utiliza fal.ai ni incluye voz**. Las imágenes con plantillas evitan una API visual pagada, pero consumen servidor, almacenamiento y, si se habilita, modelos externos.
 
 ## Créditos
+
+Refactor del catálogo y del estudio guiado por [Apple Design Skill](https://github.com/dickwu/apple-design-skill): jerarquía, tipografía legible, controles claros, foco visible, adaptación a móvil, apariencia oscura y movimiento reducido; se aplican sus principios web, conservando la identidad educativa de Ingresa PE.
 
 Diseño implementado siguiendo [Open Design](https://github.com/nexu-io/open-design), sus skills `frontend-design` e `impeccable-design-polish`, adaptadas a una interfaz académica clara, adaptados a Ingresa PE. Logo, mascota y paleta provienen de la marca. Manrope se distribuye con su [licencia OFL](public/fonts/OFL.txt).
 

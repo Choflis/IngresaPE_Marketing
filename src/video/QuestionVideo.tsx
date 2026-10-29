@@ -7,6 +7,8 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
+import { LasFijasVideo } from './LasFijasVideo';
+import { assertLasFijasLayout, assertValidChoices, type CompositionKey } from '../lib/video-format';
 export type VideoProps = {
   statement: string;
   explanation: string;
@@ -18,8 +20,38 @@ export type VideoProps = {
   clipUrl?: string;
   durationSeconds: number;
   challenge?: boolean;
+  composition?: CompositionKey;
+  clipDurationSeconds?: number;
 };
 export function QuestionVideo(p: VideoProps) {
+  try {
+    assertValidChoices(p.choices);
+    if (p.composition === 'las-fijas') assertLasFijasLayout(p);
+  } catch (e) {
+    return (
+      <AbsoluteFill
+        style={{
+          padding: 50,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#fcfcfd',
+          color: '#852139',
+          textAlign: 'center',
+          fontSize: 28,
+          fontFamily: 'Arial, sans-serif',
+        }}
+      >
+        <strong>Revisa el contenido</strong>
+        <p style={{ fontSize: 24, lineHeight: 1.5 }}>{(e as Error).message}</p>
+      </AbsoluteFill>
+    );
+  }
+  if (p.composition === 'las-fijas') return <LasFijasVideo {...p} />;
+  return <DinoVideo {...p} />;
+}
+function DinoVideo(p: VideoProps) {
+  assertValidChoices(p.choices);
   const f = useCurrentFrame();
   const { durationInFrames, fps } = useVideoConfig();
   const reveal = f > durationInFrames * 0.67;
@@ -109,7 +141,8 @@ export function QuestionVideo(p: VideoProps) {
         {p.clipUrl ? (
           <OffthreadVideo
             src={p.clipUrl}
-            style={{ height: '100%', width: '100%', objectFit: 'cover' }}
+            muted
+            style={{ height: '100%', width: '100%', objectFit: 'contain', background: '#ffffff' }}
           />
         ) : (
           <div

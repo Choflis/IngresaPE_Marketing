@@ -1,44 +1,33 @@
 # Verificación de la entrega
 
-Fecha: 2026-10-28. Entorno local Linux, Node 26.11.1 y PostgreSQL 17 en Docker. Runtime de distribución: Node 24 en Docker y .nvmrc.
+Fecha: 2026-10-29. Entorno local Linux, Node 26.11.1 y PostgreSQL 17 en Docker. Runtime de distribución: Node 24.
 
-## Evidencia obtenida
+## fal.ai y catálogo de formatos
 
-- TypeScript estricto: `npm run typecheck`, sin errores.
-- Dominio: 16 pruebas unitarias aprobadas (validación y políticas de solicitudes).
-- Base real aislada: 11 pruebas aprobadas con `npm run test:db`; cubren normalización, rollback, idempotencia concurrente, versiones, presupuesto simultáneo, incertidumbre y recuperación del proveedor.
-- Build Next.js de producción: completado.
-- Auditoría npm: sin vulnerabilidades después de fijar Zod transitorio a la versión parcheada mediante overrides.
-- Imagen Docker de la entrega base 0.1: build completado. Runtime comprobado en Node 24.22.1: web y worker saludables, login autenticado y un MP4 generado dentro del contenedor, con descarga privada HTTP 206.
-- Producción real de medios locales: PNG y dos MP4 completados en la instalación de prueba. Esto es composición local, no generación real del proveedor.
-- E2E de navegador: 4 pruebas aprobadas. Flujo guiado, selección conservada al volver de Configuración, credenciales protegidas, producción local y controles de los 25 trabajos de un lote.
+- `npm test`: **29 pruebas unitarias aprobadas**, incluyendo contrato de modelos, 450 cuadros a 15 fps, costo, rutas de cola REST, fallos de inferencia y ausencia de reenvío de POST.
+- `npm run test:db`: **15 pruebas aprobadas** en una base aislada terminada en `_test`. Cubren normalización, rollback, idempotencia concurrente, versiones, reservas simultáneas, snapshot de modelo, proveedor retirado, timeout ambiguo, recuperación y reutilización de un resultado descargado. La integración de fal está simulada; PostgreSQL es real.
+- `npm run test:e2e`: **10 pruebas aprobadas** con navegador, web y worker locales. Incluyen catálogo, selección conservada al ir a configuración/voces, filtros, móvil sin desbordamiento, clave privada, costo de fal, funcionamiento sin el video original excluido, audio privado por rangos, respuestas legadas duplicadas, recuperación de lotes y producción local real de PNG/MP4.
+- `npm run typecheck`, `npm run build` y `npm run format:check`: verificados. El build usa webpack según el comando del proyecto.
+- Migraciones aditivas 002 y 003 aplicadas a la instalación local. Se conservan preguntas, formatos, archivos y solicitudes históricas. Los trabajos pendientes del proveedor retirado requieren crear un lote nuevo; nunca se envían a fal.ai automáticamente.
+- SDK, rutas, scripts y controles activos del proveedor anterior retirados. Clave fal guardada únicamente en servidor; guardar no afirma verificar permisos ni saldo.
+- Catálogo y diseño educativo guiados por [Apple Design Skill](https://github.com/dickwu/apple-design-skill), con capturas de escritorio y móvil en `docs/screenshots/`.
 
 ## Revisión independiente
 
-Se revisó el código con un segundo agente en modo de solo lectura. Se corrigieron tres hallazgos materiales:
+Revisión de solo lectura del gateway, persistencia, estados, presupuesto, render y UI. Se corrigió un recorte del personaje en Dino responde y Reto: el clip vertical ahora usa contención y conserva el cuerpo completo. El revisor confirmó la corrección. Se renderizó un clip vertical local de referencia dentro de ambas composiciones: Dino (6 segundos) y Las fijas (30.000000 segundos, H.264, 720 × 1280, 30 fps, sin pista de audio). Los fotogramas revisados conservan el personaje completo y la clave B del ejemplo. Este montaje usa un clip sintético local, no una inferencia de fal.ai.
 
-1. Hidratación de preguntas dentro del mismo cliente transaccional, evitando agotar el pool al recibir diez lotes concurrentes. La regresión reprodujo el timeout antes del cambio y ahora aprueba las diez solicitudes.
-2. Acceso progresivo a todos los trabajos cargados, incluyendo los controles de recuperación de un lote de 25.
-3. Separación entre límite duro de una hora y heartbeat de 60 segundos con renovación automática; la prueba de pg-boss real desplaza los timestamps y ejecuta su supervisor para demostrar que una tarea sana de más de 60 segundos sigue activa y que un heartbeat perdido vuelve a la cola.
+El refactor previo corrigió también un render roto por alternativas legadas duplicadas y el desbordamiento con cinco alternativas largas. Sus regresiones siguen cubiertas por pruebas.
 
-También se sustituyó el healthcheck HTTP heredado del worker por uno que comprueba su propio heartbeat en PostgreSQL.
+El servidor de desarrollo presentó recargas continuas con «HMR hash mismatch» después del cambio de dependencias. Se apartó la caché anterior de `.next/dev`, se reinició y se verificó que el navegador carga el creador sin recargas. No se cambió ni parcheó Next.js.
 
-Se verificó por separado el montaje de un clip local con audio sintético: el MP4 resultante contiene video H.264 de 720 × 1280 y audio AAC. Esta prueba verifica que el montaje conserva audio; no es una prueba de Runway.
+## Video, voz y límites
 
-## Revisión del rediseño 0.2
+La muestra local de Las fijas en Biblioteca conserva **30.000000 segundos**, 720 × 1280 y 30 fps. La respuesta del ejemplo es **B, S/96**; el texto y las alternativas se componen con código a partir del banco aprobado.
 
-Revisión independiente en modo lectura. Se corrigió una carrera entre cambio de clave y operaciones de avatar; todas las mutaciones de configuración, incluida la CLI, comparten un advisory lock de PostgreSQL. Las solicitudes usan la clave capturada dentro del lock. El revisor verificó las correcciones sin hallazgos importantes pendientes.
+**No se ha generado un video real con fal.ai.** Falta configurar una API key con saldo para comprobar autenticación, calidad y facturación reales. Las pruebas locales y los proveedores simulados no son evidencia de una inferencia real. No se inició ninguna generación pagada durante esta implementación.
 
-Las pruebas de base usan además un almacenamiento temporal aislado para que la cuenta configurada en la instalación no altere las políticas bajo prueba.
+Los modelos configurados son LongCat Video Distilled 480p desde imagen (predeterminado) y desde texto (alternativa). La referencia de costo es US$0.005 por segundo: 30 segundos son 450 cuadros y US$0.15. La reserva mensual no consulta el saldo de fal.ai y conserva envíos que puedan haber sido cobrados.
 
-## Runway
+La voz y la sincronización labial están pendientes. La sección Voces conserva el audio de referencia, sin afirmar que exista una voz conectada. El video original en `ejemplo_Video/` está excluido de Git y Docker; el checkout funciona sin él.
 
-Conexión autenticada real verificada mediante el SDK oficial el 2026-10-28. La clave creada desde la sesión autorizada de Brave se guarda en la configuración privada, fuera de Git. Saldo de API confirmado: **0 créditos**. No se compraron créditos ni se creó un avatar con costo.
-
-**No se generó ni se evaluó un video real de Runway.** Para terminar esa validación se necesita recargar el saldo de API y preparar el avatar. Los créditos web son independientes. La UI permite conectar la clave, preparar el dinosaurio y consultar su estado.
-
-Las pruebas con proveedor simulado se limitan a situaciones de fallo/reanudación: no se presentan como evidencia de generación real. Los archivos de demostración local llevan etiqueta visible.
-
-## Límites
-
-No hay prueba de carga masiva ni garantía de capacidad ilimitada. La configuración inicial procesa dos trabajos simultáneos; el lote se limita a 25 preguntas. El almacenamiento local debe respaldarse y dimensionarse. La captura del panel muestra datos reales de una instalación de desarrollo que incluye contenido de prueba.
+Esta actualización no repite el build de la imagen Docker ni la prueba de carga. El almacenamiento debe respaldarse y dimensionarse. El panel carga hasta 1.000 preguntas y 300 trabajos/archivos recientes, y cada lote admite 25 preguntas.

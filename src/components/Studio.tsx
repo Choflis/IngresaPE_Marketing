@@ -10,34 +10,26 @@ import {
   Plus,
   ChevronRight,
   LogOut,
-  ArrowUpRight,
   CheckCircle2,
-  Clock3,
-  Wallet,
-  Activity,
   LoaderCircle,
   Menu,
   X,
   ShieldCheck,
+  Volume2,
 } from 'lucide-react';
-import {
-  api,
-  type StudioData,
-  type Screen,
-  AreaBadge,
-  Empty,
-  JobsTable,
-  Modal,
-  money,
-} from './shared';
+import { api, type StudioData, type Screen, Modal } from './shared';
 import { Creator } from './Creator';
 import { QuestionBank } from './QuestionBank';
 import { Templates, Library, Configuration } from './Workspace';
+import { Dashboard } from './Dashboard';
+import { FormatDetail } from './FormatDetail';
+import { Voices } from './Voices';
 const nav = [
-  { id: 'home', name: 'Vista general', Icon: Home },
+  { id: 'home', name: 'Inicio', Icon: Home },
   { id: 'create', name: 'Crear contenido', Icon: Clapperboard },
   { id: 'questions', name: 'Banco de preguntas', Icon: BookOpen },
-  { id: 'templates', name: 'Mis formatos', Icon: Shapes },
+  { id: 'templates', name: 'Formatos', Icon: Shapes },
+  { id: 'voices', name: 'Voces', Icon: Volume2 },
   { id: 'library', name: 'Biblioteca', Icon: FolderOpen },
 ] as const;
 export function Studio() {
@@ -46,7 +38,9 @@ export function Studio() {
     [error, setError] = useState(''),
     [toast, setToast] = useState(''),
     [mobile, setMobile] = useState(false),
-    [reconcile, setReconcile] = useState<string | null>(null);
+    [reconcile, setReconcile] = useState<string | null>(null),
+    [formatId, setFormatId] = useState<number | null>(null),
+    [launch, setLaunch] = useState<{ versionId: number; nonce: number } | null>(null);
   const refresh = useCallback(async () => {
     try {
       setData(await api('studio'));
@@ -56,12 +50,29 @@ export function Studio() {
     }
   }, []);
   useEffect(() => {
-    const hash = location.hash.slice(1);
-    if (['home', 'create', 'questions', 'templates', 'library', 'settings'].includes(hash))
-      setScreen(hash as Screen);
+    const readLocation = () => {
+      const [view, id] = location.hash.slice(1).split('/');
+      const known = [
+        'home',
+        'create',
+        'questions',
+        'templates',
+        'library',
+        'settings',
+        'voices',
+        'format',
+      ];
+      setScreen(known.includes(view) ? (view as Screen) : 'home');
+      setFormatId(view === 'format' && Number.isSafeInteger(Number(id)) ? Number(id) : null);
+    };
+    readLocation();
+    addEventListener('hashchange', readLocation);
     refresh();
     const id = setInterval(refresh, 5000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      removeEventListener('hashchange', readLocation);
+    };
   }, [refresh]);
   useEffect(() => {
     if (!toast) return;
@@ -72,6 +83,16 @@ export function Studio() {
     setScreen(s);
     location.hash = s;
     setMobile(false);
+  };
+  const openFormat = (id: number) => {
+    setFormatId(id);
+    setScreen('format');
+    location.hash = `format/${id}`;
+    setMobile(false);
+  };
+  const useFormat = (id: number) => {
+    setLaunch((last) => ({ versionId: id, nonce: (last?.nonce ?? 0) + 1 }));
+    go('create');
   };
   const notify = (v: string) => setToast(v);
   async function onJobAction(id: string, action: string) {
@@ -87,15 +108,16 @@ export function Studio() {
       notify(e instanceof Error ? e.message : 'No se pudo completar.');
     }
   }
-  const name = nav.find((n) => n.id === screen)?.name ?? 'Configuración';
+  const name =
+    screen === 'format'
+      ? (data?.templates.find((t) => t.version_id === formatId)?.name ?? 'Formato')
+      : (nav.find((n) => n.id === screen)?.name ?? 'Configuración');
   return (
     <div className="studio-layout">
       <aside className={`sidebar ${mobile ? 'mobile-open' : ''}`}>
         <div className="brand">
           <img src="/brand/logo.png" alt="Ingresa PE" />
-          <span>
-            STUDIO <b className="version-badge">0.2</b>
-          </span>
+          <span>STUDIO</span>
           <button
             className="icon-button mobile-close"
             onClick={() => setMobile(false)}
@@ -120,6 +142,7 @@ export function Studio() {
             <button
               key={id}
               className={`nav-item ${screen === id ? 'active' : ''}`}
+              aria-current={screen === id ? 'page' : undefined}
               onClick={() => go(id)}
             >
               <Icon size={18} />
@@ -204,17 +227,43 @@ export function Studio() {
             </div>
           ) : (
             <>
-              {screen === 'home' && <Dashboard data={data} go={go} onJobAction={onJobAction} />}{' '}
+              {screen === 'home' && (
+                <Dashboard
+                  data={data}
+                  go={go}
+                  onOpen={openFormat}
+                  onUse={useFormat}
+                  onJobAction={onJobAction}
+                />
+              )}{' '}
               <div hidden={screen !== 'create'}>
-                <Creator data={data} refresh={refresh} notify={notify} go={go} />
+                <Creator data={data} refresh={refresh} notify={notify} go={go} launch={launch} />
               </div>{' '}
               {screen === 'questions' && (
                 <QuestionBank data={data} refresh={refresh} notify={notify} />
               )}{' '}
               {screen === 'templates' && (
-                <Templates data={data} refresh={refresh} notify={notify} />
+                <Templates
+                  data={data}
+                  refresh={refresh}
+                  notify={notify}
+                  onOpen={openFormat}
+                  onUse={useFormat}
+                />
               )}{' '}
-              {screen === 'library' && <Library data={data} refresh={refresh} notify={notify} />}{' '}
+              {screen === 'format' && (
+                <FormatDetail
+                  data={data}
+                  versionId={formatId}
+                  onBack={() => go('home')}
+                  onUse={useFormat}
+                  onVoices={() => go('voices')}
+                />
+              )}
+              {screen === 'voices' && <Voices onBack={() => go('create')} />}
+              {screen === 'library' && (
+                <Library data={data} refresh={refresh} notify={notify} />
+              )}{' '}
               {screen === 'settings' && (
                 <Configuration data={data} notify={notify} refresh={refresh} />
               )}
@@ -236,9 +285,9 @@ export function Studio() {
         </div>
       )}
       {reconcile && (
-        <Modal title="Vincular tarea de Runway" onClose={() => setReconcile(null)}>
+        <Modal title="Vincular solicitud de fal.ai" onClose={() => setReconcile(null)}>
           <p className="muted">
-            Busca la solicitud original en Runway y pega su task ID. Se consultará esa tarea sin
+            Busca la solicitud original en fal.ai y pega su request ID. Se consultará esa tarea sin
             generar un video nuevo.
           </p>
           <form
@@ -256,7 +305,7 @@ export function Studio() {
             }}
           >
             <label>
-              Task ID
+              Request ID
               <input name="taskId" required placeholder="UUID de la tarea original" />
             </label>
             <button className="button primary">Vincular y reanudar</button>
@@ -264,177 +313,5 @@ export function Studio() {
         </Modal>
       )}
     </div>
-  );
-}
-function Dashboard({
-  data: d,
-  go,
-  onJobAction,
-}: {
-  data: StudioData;
-  go: (s: Screen) => void;
-  onJobAction: (id: string, a: string) => Promise<void>;
-}) {
-  const [visibleJobs, setVisibleJobs] = useState(8);
-  const active = d.stats.active;
-  const complete = d.stats.completed;
-  const reserved = d.stats.reserved_cents;
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">EL ESTUDIO DE TU ACADEMIA</div>
-          <h1>
-            Aquí empieza una buena lección<span className="red-dot">.</span>
-          </h1>
-          <p>Prepara contenido que enseña, resuelve dudas y acerca a tus estudiantes a la UNSA.</p>
-        </div>
-        <span className="date-label">
-          {new Date().toLocaleDateString('es-PE', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          })}
-        </span>
-      </div>
-      <section className="hero" data-od-id="production-hero">
-        <div className="hero-copy">
-          <span className="hero-label">
-            <span />
-            APRENDER COMIENZA CON UNA PREGUNTA
-          </span>
-          <h2>
-            Una pregunta.
-            <br />
-            Un mundo de
-            <br />
-            <em>posibilidades.</em>
-          </h2>
-          <p>
-            Elige una pregunta. Dale tu formato.
-            <br />
-            Deja que tu personaje haga el resto.
-          </p>
-          <button className="button light" onClick={() => go('create')}>
-            Preparar una lección <ArrowUpRight size={18} />
-          </button>
-        </div>
-        <div className="hero-art">
-          <img
-            src="/brand/mascot.webp"
-            alt="Dinosaurio de Ingresa PE, tu personaje para los videos"
-          />
-          <div className="hero-caption">
-            <span className="live-dot" /> TU MARCA, SIEMPRE EN ESCENA
-          </div>
-        </div>
-        <span className="hero-number">01 / STUDIO</span>
-      </section>
-      <section className="stats-grid" data-od-id="production-metrics">
-        {[
-          {
-            label: 'Contenido terminado',
-            value: complete,
-            note: 'Listo para revisar y compartir',
-            Icon: CheckCircle2,
-          },
-          {
-            label: 'En producción',
-            value: active,
-            note: 'Trabajos en cola y en proceso',
-            Icon: Activity,
-          },
-          {
-            label: 'Preguntas disponibles',
-            value: d.questions.length,
-            note: `${d.questions.filter((q) => q.approved).length} con explicación aprobada`,
-            Icon: BookOpen,
-          },
-          {
-            label: 'Presupuesto reservado',
-            value: money(reserved),
-            note: `De ${money(d.runway.monthlyBudgetCents)} para Runway este mes`,
-            Icon: Wallet,
-          },
-        ].map(({ label, value, note, Icon }) => (
-          <article className="stat" key={label}>
-            <div>
-              <span>{label}</span>
-              <Icon size={17} />
-            </div>
-            <strong>{value}</strong>
-            <small>{note}</small>
-          </article>
-        ))}
-      </section>
-      <div className="section-heading">
-        <div>
-          <h2>Cada área, una nueva oportunidad.</h2>
-          <p>Elige el camino de tus estudiantes y prepara algo que les ayude a avanzar.</p>
-        </div>
-        <button className="text-button" onClick={() => go('questions')}>
-          Explorar preguntas <ArrowUpRight size={16} />
-        </button>
-      </div>
-      <section className="area-grid">
-        {d.areas.map((a, i) => (
-          <button
-            key={a.id}
-            className="area-card"
-            style={{ '--area': a.color } as React.CSSProperties}
-            onClick={() => go('questions')}
-          >
-            <span className="area-symbol">{['✳', '⌘', '✺'][i]}</span>
-            <div>
-              <AreaBadge area={a} />
-              <h3>
-                {['Entender la vida.', 'Resolver lo imposible.', 'Comprender nuestro mundo.'][i]}
-              </h3>
-              <span>
-                {d.questions.filter((q) => q.areas.some((qa) => qa.id === a.id)).length} preguntas
-                en el banco
-              </span>
-            </div>
-            <ArrowUpRight size={20} />
-          </button>
-        ))}
-      </section>
-      <section className="content-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Tu mesa de producción</h2>
-            <p>La actividad más reciente de tus producciones.</p>
-          </div>
-          <span className="counter">{d.stats.total_jobs} trabajos</span>
-        </div>
-        {d.jobs.length ? (
-          <>
-            <JobsTable jobs={d.jobs.slice(0, visibleJobs)} onAction={onJobAction} />
-            {visibleJobs < d.jobs.length && (
-              <div className="jobs-pagination">
-                <span>
-                  Mostrando {Math.min(visibleJobs, d.jobs.length)} de {d.jobs.length} trabajos
-                  recientes
-                </span>
-                <button className="button small" onClick={() => setVisibleJobs((n) => n + 12)}>
-                  Mostrar más trabajos
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <Empty
-            title="Tu primera producción empieza aquí"
-            text="Elige una pregunta del banco y conviértela en tu próximo video o publicación."
-            action={
-              <button className="button" onClick={() => go('create')}>
-                <Plus size={16} />
-                Crear mi primer contenido
-              </button>
-            }
-          />
-        )}
-      </section>
-    </>
   );
 }

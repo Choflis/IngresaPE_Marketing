@@ -78,11 +78,19 @@ export async function approveQuestion(id: string) {
 }
 export async function getTemplates() {
   return query<Template>(
-    `SELECT t.*,v.id version_id,v.accent,v.duration_seconds,v.version FROM templates t JOIN template_versions v ON v.template_id=t.id WHERE v.version=(SELECT max(version) FROM template_versions WHERE template_id=t.id) ORDER BY t.id`,
+    `SELECT t.*,v.id version_id,v.accent,v.duration_seconds,v.version,v.composition FROM templates t JOIN template_versions v ON v.template_id=t.id WHERE v.version=(SELECT max(version) FROM template_versions WHERE template_id=t.id) ORDER BY (t.builtin_key='las-fijas') DESC NULLS LAST,t.id`,
   );
 }
 export async function createTemplate(input: unknown) {
   const v = templateInput.parse(input);
+  const composition =
+    v.composition ?? (v.kind === 'image' ? 'daily' : v.kind === 'carousel' ? 'carousel' : 'dino');
+  if (
+    (v.kind === 'image' && composition !== 'daily') ||
+    (v.kind === 'carousel' && composition !== 'carousel') ||
+    (v.kind === 'video' && ['daily', 'carousel'].includes(composition))
+  )
+    throw new Error('La composición no corresponde al tipo de formato.');
   return transaction(async (c) => {
     const t = (
       await c.query('INSERT INTO templates(name,description,kind) VALUES($1,$2,$3) RETURNING id', [
@@ -92,8 +100,8 @@ export async function createTemplate(input: unknown) {
       ])
     ).rows[0];
     await c.query(
-      'INSERT INTO template_versions(template_id,accent,duration_seconds) VALUES($1,$2,$3)',
-      [t.id, v.accent, v.durationSeconds],
+      'INSERT INTO template_versions(template_id,accent,duration_seconds,composition) VALUES($1,$2,$3,$4)',
+      [t.id, v.accent, composition === 'las-fijas' ? 30 : v.durationSeconds, composition],
     );
     return t;
   });

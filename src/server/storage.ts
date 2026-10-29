@@ -60,9 +60,9 @@ export async function saveUpload(bytes: Buffer, name: string, mime: string, owne
 export async function downloadProviderOutput(url: string, target: string) {
   const u = new URL(url);
   if (u.protocol !== 'https:') throw new Error('El proveedor devolvió una URL inválida.');
-  const allowed = ['runwayml.com', 'runway.com', 'cloudfront.net'];
+  const allowed = ['fal.media'];
   if (!allowed.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`)))
-    throw new Error('El dominio del archivo no es un CDN de Runway autorizado.');
+    throw new Error('El dominio del archivo no es un CDN de fal.ai autorizado.');
   const response = await fetch(u, { signal: AbortSignal.timeout(120000), redirect: 'error' });
   if (!response.ok || !response.body)
     throw new Error('No se pudo descargar el video del proveedor.');

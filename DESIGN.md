@@ -12,7 +12,7 @@ Manrope local para interfaz; titulares editoriales serif en el hero. Cuerpo 15px
 
 ## Flujo
 
-Cuatro pasos: preguntas, formato, revisión y producción. Se impide avanzar sin selección; volver conserva el lote. La revisión muestra respuesta y explicación. El paso final distingue Runway y demostración local, entrega y reserva estimada. Cambiar a Configuración conserva el borrador durante la sesión de página. La vista previa de imagen es una maqueta identificada; el archivo final se compone con Sharp.
+Cuatro pasos: preguntas, formato, revisión y producción. Se impide avanzar sin selección; volver conserva el lote. La revisión muestra respuesta y explicación. El paso final distingue animación con fal.ai y demostración local, entrega y reserva estimada. Las producciones no incluyen voz por ahora. Cambiar a Configuración conserva el borrador durante la sesión de página. La vista previa de imagen es una maqueta identificada; el archivo final se compone con Sharp.
 
 ## Movimiento y accesibilidad
 
@@ -23,3 +23,5 @@ Transiciones breves, feedback de selección, dinosaurio en el reproductor y esta
 Logo: https://ingresa.pe/logo-horizontal.png
 Personaje: https://ingresa.pe/video-character-poster.webp
 Recursos propiedad de Ingresa PE. No se modifican sus derechos.
+
+El inicio reúne el catálogo de formatos y cada formato tiene detalle y acceso al creador. Las fijas conserva el personaje de referencia, la clave revisada y una estructura fija de 30 segundos. Refactor guiado también por [Apple Design Skill](https://github.com/dickwu/apple-design-skill).

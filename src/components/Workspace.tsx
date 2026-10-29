@@ -1,32 +1,32 @@
 'use client';
 import { useState } from 'react';
-import { RunwayConnection } from './RunwayConnection';
+import { FalConnection } from './FalConnection';
+import { FormatCatalog } from './FormatCatalog';
 import {
   Plus,
-  ArrowUpRight,
   Download,
   Upload,
-  CheckCircle2,
   LoaderCircle,
-  KeyRound,
   ShieldCheck,
   Database,
-  ExternalLink,
-  FolderOpen,
   Film,
   Image as ImageIcon,
   Search,
 } from 'lucide-react';
-import { api, KindIcon, Modal, Empty, money, type StudioData } from './shared';
+import { api, Modal, Empty, type StudioData } from './shared';
 import type { Asset } from '@/lib/types';
 export function Templates({
   data: d,
   refresh,
   notify,
+  onOpen,
+  onUse,
 }: {
   data: StudioData;
   refresh: () => Promise<void>;
   notify: (s: string) => void;
+  onOpen: (id: number) => void;
+  onUse: (id: number) => void;
 }) {
   const [adding, setAdding] = useState(false),
     [error, setError] = useState(''),
@@ -37,7 +37,7 @@ export function Templates({
         <div>
           <div className="eyebrow">CONSISTENCIA QUE SE RECONOCE</div>
           <h1>
-            Mis formatos<span className="red-dot">.</span>
+            Tus formatos<span className="red-dot">.</span>
           </h1>
           <p>Una identidad compartida. Distintas maneras de contar algo bueno.</p>
         </div>
@@ -46,75 +46,12 @@ export function Templates({
           Nuevo formato
         </button>
       </div>
-      <div className="formats-grid">
-        {d.templates.map((t, i) => (
-          <article className="format-card" key={t.version_id}>
-            <div
-              className={`format-art art-${t.kind}`}
-              style={{ '--format-accent': t.accent.trim() } as React.CSSProperties}
-            >
-              <span className="mini-tag">{t.kind === 'video' ? '9:16 · MP4' : '4:5 · PNG'}</span>
-              {t.kind === 'video' ? (
-                <>
-                  <div className="mini-question">
-                    <span />
-                    {i % 2 ? '¿Te atreves con este reto?' : 'Una pregunta. Una buena explicación.'}
-                    <div>
-                      <i>A</i>
-                      <i>B</i>
-                    </div>
-                  </div>
-                  <img src="/brand/mascot.webp" alt="Vista del formato con el dinosaurio" />
-                </>
-              ) : (
-                <div className="mini-post">
-                  <img src="/brand/logo.png" alt="Ingresa PE" />
-                  <strong>
-                    {t.kind === 'carousel' ? (
-                      <>
-                        Aprende.
-                        <br />
-                        Entiende.
-                        <br />
-                        Recuerda.
-                      </>
-                    ) : (
-                      <>
-                        Tu pregunta
-                        <br />
-                        del día.
-                      </>
-                    )}
-                  </strong>
-                  <span>PREPÁRATE PARA LA UNSA ↗</span>
-                  {t.kind === 'carousel' && <div className="slide-dots">● ○ ○</div>}
-                </div>
-              )}
-              <span className="format-version">V{t.version}</span>
-            </div>
-            <div className="format-content">
-              <KindIcon kind={t.kind} />
-              <h3>{t.name}</h3>
-              <p>{t.description}</p>
-              <div>
-                <span>
-                  {t.kind === 'video'
-                    ? `Demo ${t.duration_seconds}s · audio real variable`
-                    : t.kind === 'carousel'
-                      ? '3 imágenes por pregunta'
-                      : '1 imagen por pregunta'}
-                </span>
-                <span className="color-dot" style={{ background: t.accent.trim() }} />
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+      <FormatCatalog templates={d.templates} onOpen={onOpen} onUse={onUse} />
       <div className="notice">
         <ShieldCheck size={18} />
         <span>
-          Cada trabajo conserva la versión del formato con la que se creó. Los videos de Runway
-          mantienen la duración de la respuesta hablada.
+          Cada trabajo conserva la versión del formato con la que se creó. Las fijas conserva sus 30
+          segundos; fal.ai anima al personaje y el estudio compone el contenido aprobado.
         </span>
       </div>
       {adding && (
@@ -136,6 +73,12 @@ export function Templates({
                   kind: f.get('kind'),
                   accent: f.get('accent'),
                   durationSeconds: Number(f.get('duration')),
+                  composition:
+                    f.get('kind') === 'video'
+                      ? f.get('composition')
+                      : f.get('kind') === 'image'
+                        ? 'daily'
+                        : 'carousel',
                 });
                 setAdding(false);
                 await refresh();
@@ -180,6 +123,14 @@ export function Templates({
                 <input name="duration" type="number" min={6} max={60} defaultValue={15} />
               </label>
             </div>
+            <label>
+              Composición para video
+              <select name="composition">
+                <option value="dino">Dino responde</option>
+                <option value="challenge">Reto de admisión</option>
+                <option value="las-fijas">Las fijas · 30 segundos</option>
+              </select>
+            </label>
             <label>
               Color principal
               <input name="accent" type="color" defaultValue="#C80727" />
@@ -360,7 +311,7 @@ export function Configuration({
         </span>
       </div>
       <div className="settings-grid">
-        <RunwayConnection data={d} refresh={refresh} notify={notify} />
+        <FalConnection data={d} refresh={refresh} notify={notify} />
         <div className="settings-stack">
           <section className="content-panel settings-panel">
             <div className="settings-title">
@@ -403,7 +354,7 @@ export function Configuration({
               <span style={{ background: '#F5F6FA' }} />
               <div>
                 <strong>Identidad Ingresa PE</strong>
-                <small>Diseño basado en Open Design</small>
+                <small>Tu marca en cada publicación</small>
               </div>
             </div>
           </section>

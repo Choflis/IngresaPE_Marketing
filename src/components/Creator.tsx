@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Player } from '@remotion/player';
 import {
   ArrowLeft,
@@ -19,7 +19,8 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { QuestionVideo } from '@/video/QuestionVideo';
-import { estimateCostCents, narrationFor } from '@/lib/validation';
+import { reviewProduction } from '@/lib/production-review';
+import { catalogTemplates } from '@/lib/template-catalog';
 import { api, AreaBadge, KindIcon, money, type StudioData, type Screen } from './shared';
 const steps = [
   { name: 'Preguntas', detail: 'Elige qué enseñar' },
@@ -32,20 +33,20 @@ export function Creator({
   refresh,
   notify,
   go,
+  launch,
 }: {
   data: StudioData;
   refresh: () => Promise<void>;
   notify: (s: string) => void;
   go: (s: Screen) => void;
+  launch?: { versionId: number; nonce: number } | null;
 }) {
   const [step, setStep] = useState(0),
     [selected, setSelected] = useState<string[]>([]),
     [area, setArea] = useState(''),
     [search, setSearch] = useState(''),
     [templateId, setTemplateId] = useState(d.templates[0]?.version_id ?? 0),
-    [provider, setProvider] = useState<'demo' | 'runway'>(
-      d.runway.configured && d.runway.avatarConfigured ? 'runway' : 'demo',
-    ),
+    [provider, setProvider] = useState<'demo' | 'fal'>('demo'),
     [loading, setLoading] = useState(false),
     [error, setError] = useState(''),
     [script, setScript] = useState(''),
@@ -53,6 +54,17 @@ export function Creator({
     [slide, setSlide] = useState(0);
   const requestRef = useRef<{ signature: string; key: string } | null>(null);
   const template = d.templates.find((t) => t.version_id === templateId) ?? d.templates[0];
+  useEffect(() => {
+    if (!launch) return;
+    const next = d.templates.find((t) => t.version_id === launch.versionId);
+    if (next) {
+      setTemplateId(next.version_id);
+      setSlide(0);
+      setStep(0);
+    }
+    // A catalog action starts a new selection of format. Polling must not reset a draft.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [launch]);
   const qs = d.questions.filter(
     (q) =>
       q.approved &&
@@ -61,18 +73,15 @@ export function Creator({
   );
   const chosen = d.questions.filter((q) => selected.includes(q.id));
   const q = chosen[0] ?? qs[0];
-  const configured = d.runway.configured && d.runway.avatarConfigured;
-  const runwayBlockReason = !d.runway.configured
-    ? 'Conecta tu API key de Runway desde Configuración.'
-    : !d.runway.avatarConfigured
-      ? d.runway.credits === 0
-        ? 'Runway conectado: faltan saldo de API y preparar el dinosaurio.'
-        : 'Runway conectado: falta preparar el dinosaurio en Configuración.'
-      : null;
-  const cost =
-    template?.kind === 'video' && provider === 'runway'
-      ? chosen.reduce((n, q) => n + estimateCostCents(narrationFor(q)), 0)
-      : 0;
+  const configured = d.fal.configured;
+  const falBlockReason = 'Conecta tu API key de fal.ai desde Configuración.';
+  const review = reviewProduction(
+    chosen,
+    template?.composition ?? 'dino',
+    template?.kind === 'video' ? provider : 'demo',
+    template?.duration_seconds ?? 30,
+  );
+  const cost = review.costCents;
   const props = useMemo(
     () =>
       q && template
@@ -85,7 +94,8 @@ export function Creator({
             accent: template.accent.trim(),
             demo: true,
             durationSeconds: template.duration_seconds,
-            challenge: template.name === 'Reto de admisión',
+            challenge: template.composition === 'challenge',
+            composition: template.composition,
           }
         : null,
     [q, template],
@@ -139,7 +149,7 @@ export function Creator({
   const descriptions = [
     'Empieza por una buena pregunta. Nosotros te ayudamos con el resto.',
     'Una misma identidad, distintas maneras de explicar.',
-    'La respuesta y su explicación serán la voz de tu dinosaurio.',
+    'Comprueba la clave y la explicación que aparecerán en el video.',
     'Confirma el contenido y el modo de producción de este lote.',
   ];
   return (
@@ -297,39 +307,38 @@ export function Creator({
                   </div>
                 </div>
                 <div className="template-options wizard-formats">
-                  {d.templates
-                    .filter((t) => !t.name.startsWith('Prueba MP4'))
-                    .map((t) => (
-                      <button
-                        key={t.version_id}
-                        className={`template-option ${templateId === t.version_id ? 'selected' : ''}`}
-                        onClick={() => {
-                          setTemplateId(t.version_id);
-                          setSlide(0);
-                        }}
-                      >
-                        <div className={`format-swatch swatch-${t.kind}`}>
-                          <KindIcon kind={t.kind} size={26} />
-                          <span>
-                            {t.kind === 'video' ? '9:16' : t.kind === 'image' ? '4:5' : '01 / 03'}
-                          </span>
-                        </div>
-                        <strong>{t.name}</strong>
-                        <p>{t.description}</p>
-                        <small>
-                          {t.kind === 'video'
-                            ? 'Video con personaje'
-                            : t.kind === 'image'
-                              ? 'Una imagen por pregunta'
-                              : 'Tres imágenes por pregunta'}
-                        </small>
-                        {templateId === t.version_id && (
-                          <span className="template-check">
-                            <Check size={13} />
-                          </span>
-                        )}
-                      </button>
-                    ))}
+                  {catalogTemplates(d.templates, templateId).map((t) => (
+                    <button
+                      key={t.version_id}
+                      className={`template-option ${templateId === t.version_id ? 'selected' : ''}`}
+                      aria-pressed={templateId === t.version_id}
+                      onClick={() => {
+                        setTemplateId(t.version_id);
+                        setSlide(0);
+                      }}
+                    >
+                      <div className={`format-swatch swatch-${t.kind}`}>
+                        <KindIcon kind={t.kind} size={26} />
+                        <span>
+                          {t.kind === 'video' ? '9:16' : t.kind === 'image' ? '4:5' : '01 / 03'}
+                        </span>
+                      </div>
+                      <strong>{t.name}</strong>
+                      <p>{t.description}</p>
+                      <small>
+                        {t.kind === 'video'
+                          ? 'Video con personaje'
+                          : t.kind === 'image'
+                            ? 'Una imagen por pregunta'
+                            : 'Tres imágenes por pregunta'}
+                      </small>
+                      {templateId === t.version_id && (
+                        <span className="template-check">
+                          <Check size={13} />
+                        </span>
+                      )}
+                    </button>
+                  ))}
                 </div>
                 <div className="academic-tip">
                   <Sparkles size={19} />
@@ -426,30 +435,40 @@ export function Creator({
                 {template.kind === 'video' ? (
                   <>
                     <h3 className="provider-heading">¿Cómo quieres producirlo?</h3>
+                    <div className="production-voice">
+                      <strong>Voz pendiente</strong>
+                      <small>
+                        Los videos se generan sin voz. Conservamos el audio de tu referencia para
+                        elegirla más adelante.
+                      </small>
+                      <button className="text-button" onClick={() => go('voices')}>
+                        Escuchar referencia <ArrowRight size={15} />
+                      </button>
+                    </div>
                     <div className="provider-options">
                       <button
-                        className={`provider-option ${provider === 'runway' ? 'selected' : ''}`}
-                        onClick={() => setProvider('runway')}
+                        className={`provider-option ${provider === 'fal' ? 'selected' : ''}`}
+                        onClick={() => setProvider('fal')}
                         disabled={!configured}
                       >
-                        <span className="provider-symbol runway">R</span>
+                        <span className="provider-symbol fal">f</span>
                         <div>
                           <strong>
-                            Runway · Tu dinosaurio hablando <span className="mini-tag">IA</span>
+                            fal.ai · Anima tu dinosaurio <span className="mini-tag">IA</span>
                           </strong>
                           <small>
                             {configured
-                              ? 'Una actuación y una voz para cada explicación.'
-                              : runwayBlockReason}
+                              ? 'LongCat 480p · 15 fps · sin voz · $0.005 por segundo.'
+                              : falBlockReason}
                           </small>
                         </div>
-                        <span className="radio">{provider === 'runway' && <i />}</span>
+                        <span className="radio">{provider === 'fal' && <i />}</span>
                       </button>
                       {!configured && (
                         <button className="connect-inline" onClick={() => go('settings')}>
-                          {d.runway.configured
-                            ? 'Completar configuración de Runway'
-                            : 'Conectar Runway en Configuración'}{' '}
+                          {d.fal.configured
+                            ? 'Configurar fal.ai'
+                            : 'Conectar fal.ai en Configuración'}{' '}
                           <ArrowRight size={16} />
                         </button>
                       )}
@@ -478,7 +497,7 @@ export function Creator({
                           <strong>
                             Generar {selected.length} {selected.length === 1 ? 'video' : 'videos'}
                           </strong>
-                          . Para el dinosaurio hablando, completa los requisitos de Runway.
+                          . Para animarlo con IA, conecta tu clave de fal.ai.
                         </p>
                       </div>
                     )}
@@ -503,20 +522,32 @@ export function Creator({
                 <div className="cost-summary">
                   <div>
                     <span>Reserva estimada de este lote</span>
-                    <strong>
-                      {money(cost)} <small>USD</small>
-                    </strong>
+                    <strong>{money(cost)}</strong>
                   </div>
-                  <span>{cost ? 'Según texto y duración estimada' : 'Composición local'}</span>
+                  <span>{cost ? '$0.005 por segundo generado' : 'Composición local'}</span>
                 </div>
                 <p className="fine-print">
                   {cost
-                    ? 'La reserva es orientativa, no una factura. La duración final depende de la respuesta hablada.'
+                    ? `Cada video dura ${template.duration_seconds} segundos. La animación se genera en 480p a 15 fps, sin voz. La reserva se redondea al centavo y no representa el saldo real de fal.ai.`
                     : 'Tu equipo procesa los archivos. La prueba local se identifica como demostración.'}
                 </p>
               </>
             )}
           </section>
+          {review.errors.length > 0 && (
+            <div className="error-message" role="alert">
+              <strong>Revisa el contenido seleccionado</strong>
+              <ul>
+                {review.errors.map((issue) => (
+                  <li key={issue.id}>{issue.message}</li>
+                ))}
+              </ul>
+              <span>
+                Puedes quitar la pregunta o elegir otro formato. No se enviará una generación
+                mientras haya errores.
+              </span>
+            </div>
+          )}
           {error && (
             <div className="error-message" role="alert">
               {error}
@@ -548,7 +579,8 @@ export function Creator({
                 disabled={
                   loading ||
                   !selected.length ||
-                  (provider === 'runway' && !configured && template.kind === 'video')
+                  review.errors.length > 0 ||
+                  (provider === 'fal' && !configured && template.kind === 'video')
                 }
                 onClick={generate}
               >

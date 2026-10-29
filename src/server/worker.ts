@@ -46,7 +46,7 @@ async function dispatch() {
 await dispatch();
 const timer = setInterval(dispatch, 5000);
 console.log(
-  `Worker listo. Concurrencia: ${concurrency}. Modo demo disponible; Runway: ${process.env.RUNWAYML_API_SECRET ? 'configurado' : 'pendiente de credenciales'}.`,
+  `Worker listo. Concurrencia: ${concurrency}. Modo demo disponible; fal.ai: configuración privada del servidor.`,
 );
 async function shutdown() {
   clearInterval(timer);

@@ -17,20 +17,17 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "runway:check": "tsx scripts/runway-check.ts",
-    "runway:avatar": "tsx scripts/runway-avatar.ts",
-    "runway:smoke": "tsx scripts/runway-smoke.ts",
     "test:db": "tsx scripts/test-db.ts",
     "account:reset": "tsx scripts/reset-account.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "worker:health": "tsx scripts/worker-health.ts"
+    "worker:health": "tsx scripts/worker-health.ts",
+    "preview:las-fijas": "tsx scripts/preview-las-fijas.ts"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.539",
     "@remotion/player": "4.0.539",
     "@remotion/renderer": "4.0.539",
-    "@runwayml/sdk": "4.24.0",
     "bcryptjs": "3.0.3",
     "dotenv": "18.0.9",
     "lucide-react": "1.63.0",

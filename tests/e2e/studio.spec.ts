@@ -10,7 +10,7 @@ test('acceso privado y flujo real de imágenes y videos por lote', async ({ page
   await page.getByLabel('Correo electrónico').fill(process.env.ADMIN_EMAIL!);
   await page.getByLabel('Contraseña', { exact: true }).fill(process.env.ADMIN_PASSWORD!);
   await page.getByRole('button', { name: 'Entrar al estudio' }).click();
-  await expect(page.getByRole('heading', { name: /Aquí empieza una buena lección/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Una idea. Muchos formatos./ })).toBeVisible();
   await mkdir('docs/screenshots', { recursive: true });
   await page.screenshot({
     path: 'docs/screenshots/dashboard.png',
@@ -62,7 +62,7 @@ test('acceso privado y flujo real de imágenes y videos por lote', async ({ page
   await page.getByRole('button', { name: 'Revisar contenido' }).click();
   await page.getByRole('button', { name: 'Preparar producción' }).click();
   await page.getByRole('button', { name: /Generar 1 publicación/ }).click();
-  await expect(page.getByRole('heading', { name: /Aquí empieza una buena lección/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Una idea. Muchos formatos./ })).toBeVisible();
   const headers = {
     Origin: process.env.APP_URL ?? 'http://localhost:3000',
     'Idempotency-Key': randomUUID(),
@@ -144,6 +144,7 @@ test('permite acceder a la recuperación de los 25 trabajos de un lote', async (
     const base = data.jobs[0];
     data.jobs = Array.from({ length: 25 }, (_, i) => ({
       ...base,
+      provider: 'fal',
       id: randomUUID(),
       statement: `Trabajo pendiente de revisión ${i + 1}`,
       status: 'needs_attention',

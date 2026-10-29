@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z, ZodError } from 'zod';
 import { cookies } from 'next/headers';
-import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
-import { Readable } from 'node:stream';
 import path from 'node:path';
 import sharp from 'sharp';
+import { existsSync } from 'node:fs';
+import { falModelSchema } from '@/lib/fal-contract';
 import {
   COOKIE,
   checkOrigin,
@@ -25,14 +24,11 @@ import {
 } from '@/server/catalog';
 import { createBatch, getJobs } from '@/server/production';
 import { canRetryJob } from '@/server/policy';
-import { cancelRunway, pollRunway, runwayClient, providerError } from '@/server/runway';
-import {
-  getProviderSettings,
-  saveProviderSettings,
-  publicProviderStatus,
-} from '@/server/provider-settings';
+import { cancelFal, pollFal, falRequestId } from '@/server/fal';
+import { saveProviderSettings, publicProviderStatus } from '@/server/provider-settings';
 import { withProviderLock } from '@/server/provider-lock';
 import { saveUpload, storageRoot } from '@/server/storage';
+import { privateFileResponse } from '@/server/media-response';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 type Context = { params: Promise<{ path: string[] }> };
@@ -95,7 +91,7 @@ async function handle(req: Request, ctx: Context) {
         "SELECT EXISTS(SELECT 1 FROM worker_heartbeats WHERE last_seen_at>now()-interval '20 seconds') worker_online",
       ),
       query(
-        `SELECT count(*)::int total_jobs,count(*) FILTER(WHERE j.status='completed')::int completed,count(*) FILTER(WHERE j.status IN ('queued','generating','rendering'))::int active,COALESCE(sum(j.estimated_cost_cents) FILTER(WHERE j.provider='runway' AND j.created_at>=date_trunc('month',now()) AND (j.status<>'cancelled' OR EXISTS(SELECT 1 FROM provider_requests p WHERE p.job_id=j.id))),0)::int reserved_cents FROM video_jobs j JOIN batches b ON b.id=j.batch_id WHERE b.owner_id=$1`,
+        `SELECT count(*)::int total_jobs,count(*) FILTER(WHERE j.status='completed')::int completed,count(*) FILTER(WHERE j.status IN ('queued','generating','rendering'))::int active,COALESCE(sum(j.estimated_cost_cents) FILTER(WHERE j.provider='fal' AND j.created_at>=date_trunc('month',now()) AND (j.status<>'cancelled' OR EXISTS(SELECT 1 FROM provider_requests p WHERE p.job_id=j.id))),0)::int reserved_cents FROM video_jobs j JOIN batches b ON b.id=j.batch_id WHERE b.owner_id=$1`,
         [user.id],
       ),
     ]);
@@ -109,9 +105,25 @@ async function handle(req: Request, ctx: Context) {
       assets,
       stats: stats[0],
       workerOnline: health[0].worker_online,
-      runway: publicProviderStatus(),
+      fal: publicProviderStatus(),
+      referenceVideoAvailable: existsSync(
+        path.resolve('ejemplo_Video/gemini_generated_video_3778db79.mp4'),
+      ),
     });
   }
+  if (route === 'references/las-fijas/audio' && method === 'GET')
+    return privateFileResponse(
+      req,
+      path.resolve('resources/reference/las-fijas-voice.mp3'),
+      'audio/mpeg',
+      new URL(req.url).searchParams.has('download') ? 'las-fijas-referencia.mp3' : undefined,
+    );
+  if (route === 'references/las-fijas/video' && method === 'GET')
+    return privateFileResponse(
+      req,
+      path.resolve('ejemplo_Video/gemini_generated_video_3778db79.mp4'),
+      'video/mp4',
+    );
   if (route === 'questions' && method === 'POST')
     return NextResponse.json(await createQuestion(await body(req)), { status: 201 });
   if (parts[0] === 'questions' && parts[2] === 'approve' && method === 'POST') {
@@ -134,9 +146,9 @@ async function handle(req: Request, ctx: Context) {
     if (parts[2] === 'cancel') {
       if (j.status === 'completed') throw new HttpError(409, 'Este trabajo ya terminó.');
       await query("UPDATE video_jobs SET status='cancelled',updated_at=now() WHERE id=$1", [id]);
-      if (j.remote_task_id) {
+      if (j.provider === 'fal' && j.remote_task_id) {
         try {
-          await cancelRunway(j.remote_task_id);
+          await cancelFal(j.remote_task_id);
         } catch {
           /* Local cancellation stays effective; the remote provider may have completed already. */
         }
@@ -154,7 +166,7 @@ async function handle(req: Request, ctx: Context) {
       )
         throw new HttpError(
           409,
-          'Revisa la solicitud en Runway y vincula su task ID, o crea un lote nuevo para una generación nueva.',
+          'Revisa la solicitud en fal.ai y vincula su request ID, o crea un lote nuevo para una generación nueva.',
         );
       await query(
         "UPDATE video_jobs SET status='queued',error_message=null,updated_at=now() WHERE id=$1",
@@ -163,10 +175,12 @@ async function handle(req: Request, ctx: Context) {
       return NextResponse.json({ ok: true });
     }
     if (parts[2] === 'reconcile') {
-      const { taskId } = z.object({ taskId: z.string().uuid() }).parse(await body(req));
+      const { taskId } = z.object({ taskId: falRequestId }).parse(await body(req));
+      if (j.provider !== 'fal')
+        throw new HttpError(409, 'Solo se pueden vincular solicitudes de fal.ai.');
       if (j.status !== 'needs_attention')
         throw new HttpError(409, 'Este trabajo no requiere conciliación.');
-      await pollRunway(taskId);
+      await pollFal(taskId);
       await transaction(async (c) => {
         await c.query(
           "UPDATE provider_requests SET remote_task_id=$2,state='submitted',updated_at=now() WHERE job_id=$1",
@@ -189,39 +203,12 @@ async function handle(req: Request, ctx: Context) {
     if (!asset) throw new HttpError(404, 'Archivo no encontrado.');
     const file = path.resolve(storageRoot(), asset.storage_path);
     if (!file.startsWith(storageRoot() + path.sep)) throw new HttpError(404, 'Archivo inválido.');
-    let size: number;
-    try {
-      size = (await stat(file)).size;
-    } catch {
-      throw new HttpError(404, 'El archivo no está disponible en el volumen de almacenamiento.');
-    }
-    const headers: Record<string, string> = {
-      'Content-Type': asset.mime_type,
-      'Cache-Control': 'private, no-store',
-      'Accept-Ranges': 'bytes',
-      'X-Content-Type-Options': 'nosniff',
-    };
-    if (new URL(req.url).searchParams.get('download'))
-      headers['Content-Disposition'] =
-        `attachment; filename="ingresape-${id}.${asset.mime_type === 'video/mp4' ? 'mp4' : asset.mime_type === 'image/png' ? 'png' : 'jpg'}"`;
-    const range = req.headers.get('range');
-    if (range) {
-      const m = /^bytes=(\d+)-(\d*)$/.exec(range);
-      if (!m)
-        return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
-      const start = Number(m[1]),
-        end = m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
-      if (start >= size || end < start)
-        return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
-      headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
-      headers['Content-Length'] = String(end - start + 1);
-      return new Response(
-        Readable.toWeb(createReadStream(file, { start, end })) as ReadableStream,
-        { status: 206, headers },
-      );
-    }
-    headers['Content-Length'] = String(size);
-    return new Response(Readable.toWeb(createReadStream(file)) as ReadableStream, { headers });
+    const extension =
+      asset.mime_type === 'video/mp4' ? 'mp4' : asset.mime_type === 'image/png' ? 'png' : 'jpg';
+    const download = new URL(req.url).searchParams.has('download')
+      ? `ingresape-${id}.${extension}`
+      : undefined;
+    return privateFileResponse(req, file, asset.mime_type, download);
   }
   if (route === 'upload' && method === 'POST') {
     if (Number(req.headers.get('content-length') ?? 0) > 11 * 1024 * 1024)
@@ -239,107 +226,17 @@ async function handle(req: Request, ctx: Context) {
       status: 201,
     });
   }
-  if (route === 'runway/connect' && method === 'POST') {
+  if (route === 'fal/connect' && method === 'POST') {
+    const input = z
+      .object({
+        apiKey: z.string().trim().min(16, 'Ingresa una API key válida.').max(4096).regex(/^\S+$/),
+        model: falModelSchema,
+      })
+      .parse(await body(req, 8192));
     return withProviderLock(async () => {
-      const input = z
-        .object({
-          apiKey: z.string().trim().min(16, 'Ingresa una API key válida.').max(4096),
-          avatarId: z.string().uuid().optional(),
-        })
-        .parse(await body(req, 8192));
-      try {
-        const client = runwayClient(input.apiKey);
-        const org = await client.organization.retrieve();
-        let avatarStatus: 'ready' | 'processing' | undefined;
-        if (input.avatarId) {
-          const avatar = await client.avatars.retrieve(input.avatarId);
-          avatarStatus = avatar.status === 'READY' ? 'ready' : 'processing';
-        }
-        const previous = getProviderSettings();
-        const same = previous.apiKey === input.apiKey;
-        saveProviderSettings({
-          apiKey: input.apiKey,
-          avatarId: input.avatarId ?? (same ? previous.avatarId : undefined),
-          avatarStatus: avatarStatus ?? (same ? previous.avatarStatus : undefined),
-          verifiedAt: new Date().toISOString(),
-          credits: typeof org.creditBalance === 'number' ? org.creditBalance : null,
-        });
-        return NextResponse.json({ ok: true, ...publicProviderStatus() });
-      } catch (e) {
-        throw new HttpError(400, providerError(e));
-      }
+      saveProviderSettings({ ...input, savedAt: new Date().toISOString() });
+      return NextResponse.json({ ok: true, ...publicProviderStatus() });
     });
-  }
-  if (route === 'runway/avatar' && method === 'POST') {
-    return withProviderLock(async () => {
-      const settings = getProviderSettings();
-      if (!settings.apiKey) throw new HttpError(400, 'Conecta primero tu API key.');
-      if (settings.avatarId) return NextResponse.json({ ok: true, ...publicProviderStatus() });
-      if (['creating', 'uncertain'].includes(settings.avatarStatus ?? ''))
-        throw new HttpError(
-          409,
-          'Revisa el avatar en Runway y conecta su ID para evitar crearlo dos veces.',
-        );
-      saveProviderSettings({ ...settings, avatarStatus: 'creating' });
-      try {
-        const bytes = await sharp('public/brand/mascot.webp')
-          .resize({ width: 1280, withoutEnlargement: true })
-          .png()
-          .toBuffer();
-        const avatar = await runwayClient(settings.apiKey).avatars.create({
-          name: 'Dino · Ingresa PE',
-          personality:
-            'Eres el dinosaurio educativo de Ingresa PE. Explica a postulantes de la UNSA en español peruano, con claridad y gestos naturales.',
-          referenceImage: `data:image/png;base64,${bytes.toString('base64')}`,
-          voice: { type: 'runway-live-preset', presetId: 'adrian' },
-          imageProcessing: 'optimize',
-        });
-        saveProviderSettings({
-          ...settings,
-          avatarId: avatar.id,
-          avatarStatus: avatar.status === 'READY' ? 'ready' : 'processing',
-        });
-        return NextResponse.json({ ok: true, ...publicProviderStatus() });
-      } catch (e) {
-        saveProviderSettings({ ...settings, avatarStatus: 'uncertain' });
-        throw new HttpError(400, providerError(e));
-      }
-    });
-  }
-  if (route === 'runway/avatar/status' && method === 'POST') {
-    return withProviderLock(async () => {
-      const settings = getProviderSettings();
-      if (!settings.avatarId)
-        throw new HttpError(400, 'Prepara primero el dinosaurio o conecta un avatar existente.');
-      try {
-        const avatar = await runwayClient(settings.apiKey).avatars.retrieve(settings.avatarId);
-        if (avatar.status === 'FAILED')
-          throw new HttpError(
-            400,
-            'Runway no pudo preparar este avatar. Revisa su imagen en el portal.',
-          );
-        saveProviderSettings({
-          ...settings,
-          avatarStatus: avatar.status === 'READY' ? 'ready' : 'processing',
-        });
-        return NextResponse.json({ ok: true, ...publicProviderStatus() });
-      } catch (e) {
-        if (e instanceof HttpError) throw e;
-        throw new HttpError(400, providerError(e));
-      }
-    });
-  }
-  if (route === 'runway/check' && method === 'POST') {
-    try {
-      const org = await runwayClient().organization.retrieve();
-      return NextResponse.json({
-        ok: true,
-        message: 'Conexión con Runway verificada. No se generó contenido.',
-        credits: 'creditBalance' in org ? org.creditBalance : null,
-      });
-    } catch (e) {
-      throw new HttpError(400, providerError(e));
-    }
   }
   if (route === 'assistant/draft' && method === 'POST') {
     const v = z.object({ questionId: z.string().uuid() }).parse(await body(req));

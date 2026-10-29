@@ -162,25 +162,44 @@ try {
           [v.id, correct, wrong],
         );
       }
-    if (!(await c.query('SELECT 1 FROM templates LIMIT 1')).rowCount)
-      for (const [name, description, kind] of [
-        ['Dino responde', 'Pregunta fija, dinosaurio animado y explicación al cierre.', 'video'],
-        ['Reto de admisión', 'Cuenta regresiva y alternativa correcta destacada.', 'video'],
-        [
-          'Pregunta del día',
-          'Una pregunta lista para compartir con la identidad de Ingresa PE.',
-          'image',
-        ],
-        ['Repaso en tres pasos', 'Pregunta, pista y explicación en tres imágenes.', 'carousel'],
-      ]) {
-        const t = (
-          await c.query(
-            'INSERT INTO templates(name,description,kind) VALUES($1,$2,$3) RETURNING id',
-            [name, description, kind],
-          )
-        ).rows[0];
-        await c.query('INSERT INTO template_versions(template_id) VALUES($1)', [t.id]);
-      }
+    for (const [name, description, kind, key] of [
+      [
+        'Dino responde',
+        'Pregunta fija, dinosaurio animado y explicación al cierre.',
+        'video',
+        'dino',
+      ],
+      [
+        'Reto de admisión',
+        'Cuenta regresiva y alternativa correcta destacada.',
+        'video',
+        'challenge',
+      ],
+      [
+        'Pregunta del día',
+        'Una pregunta lista para compartir con la identidad de Ingresa PE.',
+        'image',
+        'daily',
+      ],
+      [
+        'Repaso en tres pasos',
+        'Pregunta, pista y explicación en tres imágenes.',
+        'carousel',
+        'carousel',
+      ],
+    ]) {
+      if ((await c.query('SELECT 1 FROM templates WHERE builtin_key=$1', [key])).rowCount) continue;
+      const t = (
+        await c.query(
+          'INSERT INTO templates(name,description,kind,builtin_key) VALUES($1,$2,$3,$4) RETURNING id',
+          [name, description, kind, key],
+        )
+      ).rows[0];
+      await c.query('INSERT INTO template_versions(template_id,composition) VALUES($1,$2)', [
+        t.id,
+        key,
+      ]);
+    }
   });
   console.log('Propietario, catálogo y contenido de muestra preparados.');
 } catch (e) {

@@ -11,3 +11,6 @@ playwright-report
 docs/screenshots
 coverage
 *.tsbuildinfo
+
+# Original sample video remains on the developer machine.
+ejemplo_Video
