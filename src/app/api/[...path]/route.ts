@@ -5,6 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { existsSync } from 'node:fs';
 import { falModelSchema } from '@/lib/fal-contract';
+import { GEMINI_TTS_MODEL } from '@/lib/voices';
 import {
   COOKIE,
   checkOrigin,
@@ -106,6 +107,10 @@ async function handle(req: Request, ctx: Context) {
       stats: stats[0],
       workerOnline: health[0].worker_online,
       fal: publicProviderStatus(),
+      narration: {
+        configured: Boolean(process.env.GEMINI_API_KEY?.trim()),
+        model: GEMINI_TTS_MODEL,
+      },
       referenceVideoAvailable: existsSync(
         path.resolve('ejemplo_Video/gemini_generated_video_3778db79.mp4'),
       ),

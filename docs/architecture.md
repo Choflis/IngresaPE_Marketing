@@ -6,7 +6,8 @@
 - **PostgreSQL 17**: catálogo normalizado, versiones, sesiones, medios y producción.
 - **pg-boss 12**: cola duradera en un esquema separado de PostgreSQL. No requiere Redis.
 - **Worker Node.js**: despacha el outbox de trabajos y procesa varios en paralelo.
-- **fal.ai por REST**: LongCat Video Distilled 480p desde imagen (predeterminado) o texto. Cola remota, polling por request ID y descarga privada del clip. La voz se integrará por separado.
+- **fal.ai por REST**: LongCat Video Distilled 480p desde imagen (predeterminado) o texto. Cola remota, polling por request ID y descarga privada del clip.
+- **Gemini TTS + FFmpeg**: narración opcional de Puck, Sadachbia, Achird o Fenrir, congelada en `video_jobs.voice`. El worker genera segmentos privados antes de solicitar fal.ai, mide su duración, ajusta los tiempos visuales y añade una pista AAC al MP4 sin volver a codificar el video. Funciona también con la animación local.
 - **Remotion**: conserva el diseño y compone el clip animado, pregunta, alternativas y cierre como MP4 H.264.
 - **Sharp**: publicaciones PNG y carruseles de tres imágenes.
 - **Gemini opcional**: borrador de guion a partir de la explicación existente. El borrador no reemplaza el contenido aprobado ni cambia automáticamente lo que se dibuja en el video.
@@ -20,6 +21,8 @@ La cola utiliza política `exclusive` por ID de trabajo. Un advisory lock por tr
 Antes de llamar al proveedor se registra una solicitud en estado `submitting`. El gateway hace un único POST sin reintentos de creación. Las consultas GET pueden recuperarse con el mismo request ID. Si se recibe el ID, se persiste y los siguientes intentos consultan ese ID. Si el resultado del envío es ambiguo, el trabajo pasa a `needs_attention`: el propietario debe comprobar el portal y vincular la tarea original. Esto prioriza evitar un segundo cobro sobre reintentar a ciegas. No es posible garantizar exactly-once sobre un servicio externo sin idempotencia compartida.
 
 Los medios se descargan del proveedor a almacenamiento persistente para no depender de sus enlaces temporales. No se exponen como archivos públicos: la API comprueba la sesión y el propietario y admite rangos para reproducir MP4.
+
+La narración usa registros privados por segmento antes de llamar a Gemini. Los audios confirmados se reutilizan al reintentar. Un timeout, respuesta incompleta o HTTP 408/5xx conserva un registro pendiente y requiere revisión; una cuota rechazada permite reintento manual. No se sustituyen automáticamente voces, modelos o proveedores. Las transiciones se basan en cuadros de 30 fps; se dejan al menos dos segundos para pensar, se conserva el tono y se admite como máximo una aceleración de 1,25. Si la voz no cabe, no se solicita una nueva animación a fal.ai.
 
 ## Normalización
 

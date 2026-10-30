@@ -21,6 +21,8 @@ import {
 import { QuestionVideo } from '@/video/QuestionVideo';
 import { reviewProduction } from '@/lib/production-review';
 import { catalogTemplates } from '@/lib/template-catalog';
+import { NarrationSelector } from './NarrationSelector';
+import type { VoiceSelection } from '@/lib/voices';
 import { api, AreaBadge, KindIcon, money, type StudioData, type Screen } from './shared';
 const steps = [
   { name: 'Preguntas', detail: 'Elige qué enseñar' },
@@ -47,6 +49,9 @@ export function Creator({
     [search, setSearch] = useState(''),
     [templateId, setTemplateId] = useState(d.templates[0]?.version_id ?? 0),
     [provider, setProvider] = useState<'demo' | 'fal'>('demo'),
+    [voiceName, setVoiceName] = useState<VoiceSelection['name'] | ''>(
+      d.narration.configured ? 'Puck' : '',
+    ),
     [loading, setLoading] = useState(false),
     [error, setError] = useState(''),
     [script, setScript] = useState(''),
@@ -122,6 +127,8 @@ export function Creator({
         questionIds: selected,
         templateVersionId: templateId,
         provider,
+        voice:
+          template.kind === 'video' && voiceName ? { provider: 'gemini', name: voiceName } : null,
         name: `${template.name} · ${chosen.length} ${chosen.length === 1 ? 'pregunta' : 'preguntas'}`,
       };
       const signature = JSON.stringify(payload);
@@ -435,16 +442,11 @@ export function Creator({
                 {template.kind === 'video' ? (
                   <>
                     <h3 className="provider-heading">¿Cómo quieres producirlo?</h3>
-                    <div className="production-voice">
-                      <strong>Voz pendiente</strong>
-                      <small>
-                        Los videos se generan sin voz. Conservamos el audio de tu referencia para
-                        elegirla más adelante.
-                      </small>
-                      <button className="text-button" onClick={() => go('voices')}>
-                        Escuchar referencia <ArrowRight size={15} />
-                      </button>
-                    </div>
+                    <NarrationSelector
+                      value={voiceName}
+                      configured={d.narration.configured}
+                      onChange={setVoiceName}
+                    />
                     <div className="provider-options">
                       <button
                         className={`provider-option ${provider === 'fal' ? 'selected' : ''}`}
@@ -458,7 +460,7 @@ export function Creator({
                           </strong>
                           <small>
                             {configured
-                              ? 'LongCat 480p · 15 fps · sin voz · $0.005 por segundo.'
+                              ? 'LongCat 480p · 15 fps · $0.005 por segundo de animación.'
                               : falBlockReason}
                           </small>
                         </div>
@@ -479,11 +481,11 @@ export function Creator({
                         <span className="provider-symbol">ip</span>
                         <div>
                           <strong>
-                            Video local <span className="mini-tag">SIN API</span>
+                            Video local <span className="mini-tag">SIN FAL.AI</span>
                           </strong>
                           <small>
-                            Crea un MP4 con el dinosaurio en movimiento de muestra, sin voz ni costo
-                            de API.
+                            Anima la imagen del dinosaurio en tu equipo. Puedes añadir la voz de
+                            Gemini seleccionada arriba.
                           </small>
                         </div>
                         <span className="radio">{provider === 'demo' && <i />}</span>
@@ -528,8 +530,10 @@ export function Creator({
                 </div>
                 <p className="fine-print">
                   {cost
-                    ? `Cada video dura ${template.duration_seconds} segundos. La animación se genera en 480p a 15 fps, sin voz. La reserva se redondea al centavo y no representa el saldo real de fal.ai.`
-                    : 'Tu equipo procesa los archivos. La prueba local se identifica como demostración.'}
+                    ? `Cada video dura ${template.duration_seconds} segundos. La animación se genera en 480p a 15 fps. La reserva cubre fal.ai y no incluye el consumo de Gemini ni representa el saldo real de tu cuenta.`
+                    : template.kind === 'video' && voiceName
+                      ? 'La animación se procesa en tu equipo; la narración usa la cuota de Gemini. La reserva mostrada corresponde solo a fal.ai.'
+                      : 'Tu equipo procesa los archivos. La prueba local se identifica como demostración.'}
                 </p>
               </>
             )}
@@ -580,7 +584,8 @@ export function Creator({
                   loading ||
                   !selected.length ||
                   review.errors.length > 0 ||
-                  (provider === 'fal' && !configured && template.kind === 'video')
+                  (provider === 'fal' && !configured && template.kind === 'video') ||
+                  (template.kind === 'video' && Boolean(voiceName) && !d.narration.configured)
                 }
                 onClick={generate}
               >
@@ -668,7 +673,7 @@ export function Creator({
           <div className="preview-note">
             <span className="live-dot" />
             {template?.kind === 'video'
-              ? 'Muestra del diseño · animación local'
+              ? 'Muestra del diseño sin narración · la voz se incorpora al generar'
               : 'Maqueta del contenido · el archivo final se compone al generar'}
           </div>
           <div className="preview-selection">

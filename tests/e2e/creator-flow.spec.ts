@@ -96,6 +96,7 @@ test('explica el bloqueo de fal.ai y permite producir un video local desde el cr
       exact: true,
     }),
   ).toBeVisible();
+  await page.getByLabel('Voz del dinosaurio', { exact: true }).selectOption('');
   const response = page.waitForResponse(
     (r) => r.url().endsWith('/api/batches') && r.request().method() === 'POST',
   );

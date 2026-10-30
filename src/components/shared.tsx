@@ -24,6 +24,7 @@ export type StudioData = {
   assets: Asset[];
   workerOnline: boolean;
   referenceVideoAvailable: boolean;
+  narration: { configured: boolean; model: string };
   stats: { total_jobs: number; completed: number; active: number; reserved_cents: number };
   fal: {
     configured: boolean;

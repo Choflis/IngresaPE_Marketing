@@ -147,7 +147,8 @@ test('el formato funciona sin el video original y muestra el costo de fal antes 
   await page.getByRole('button', { name: 'Revisar contenido' }).click();
   await page.getByRole('button', { name: 'Preparar producción' }).click();
   await page.getByRole('button', { name: /fal.ai · Anima tu dinosaurio/ }).click();
-  await expect(page.locator('.production-voice')).toContainText('Voz pendiente');
+  await expect(page.locator('.production-voice')).toContainText('Voz del dinosaurio');
+  await expect(page.getByLabel('Voz del dinosaurio', { exact: true })).toHaveValue('Puck');
   await expect(page.locator('.cost-summary')).toContainText('0.15');
   await expect(page.getByRole('button', { name: 'Generar 1 video', exact: true })).toBeEnabled();
   expect(submissions).toBe(0);

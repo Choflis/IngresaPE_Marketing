@@ -1171,6 +1171,62 @@ td {
 .detail-create {
   margin-top: 25px;
 }
+.voice-catalog {
+  margin-bottom: 30px;
+}
+.voice-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.voice-preview-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+.voice-preview-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+.voice-preview-heading h3 {
+  font-size: 21px;
+  margin-bottom: 3px;
+}
+.voice-preview-heading > div {
+  flex: 1;
+}
+.voice-preview-heading > div > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.voice-preview-card > p,
+.voice-catalog-note {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.voice-preview-card audio {
+  width: 100%;
+  max-width: 100%;
+  margin-top: auto;
+}
+.voice-preview-card .voice-preview-error {
+  color: var(--red);
+}
+.voice-catalog-note {
+  margin-top: 18px;
+}
+.voice-catalog-note a {
+  color: var(--red);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .voices-intro-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2080,6 +2136,16 @@ td {
   margin: 0 0 7px;
   font-size: 12px;
 }
+.narration-selector {
+  display: grid;
+  gap: 10px;
+}
+.narration-selector select,
+.narration-selector audio {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
 .production-voice small {
   display: block;
   font-size: 11px;
@@ -2438,6 +2504,7 @@ td {
     font-size: 12px;
   }
   .settings-grid,
+  .voice-catalog-grid,
   .voices-intro-grid {
     grid-template-columns: 1fr;
   }
@@ -2989,7 +3056,8 @@ td {
     background: #c32343;
     border-color: #c32343;
   }
-  .reference-audio audio {
+  .reference-audio audio,
+  .voice-preview-card audio {
     color-scheme: dark;
   }
   .catalog-ratio {

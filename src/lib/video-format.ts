@@ -20,12 +20,15 @@ export function assertValidChoices(choices: Choice[]) {
   return correct[0];
 }
 
-export function lasFijasPhase(seconds: number): 'intro' | 'question' | 'answer' | 'outro' {
-  return seconds < LAS_FIJAS.questionAt
+export function lasFijasPhase(
+  seconds: number,
+  timing: { questionAt: number; answerAt: number; outroAt: number } = LAS_FIJAS,
+): 'intro' | 'question' | 'answer' | 'outro' {
+  return seconds < timing.questionAt
     ? 'intro'
-    : seconds < LAS_FIJAS.answerAt
+    : seconds < timing.answerAt
       ? 'question'
-      : seconds < LAS_FIJAS.outroAt
+      : seconds < timing.outroAt
         ? 'answer'
         : 'outro';
 }

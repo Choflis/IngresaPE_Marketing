@@ -67,7 +67,8 @@ export function LasFijasVideo(p: VideoProps) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const seconds = frame / fps;
-  const phase = lasFijasPhase(seconds);
+  const timing = p.narrationTiming ?? LAS_FIJAS;
+  const phase = lasFijasPhase(seconds, timing);
   const reveal = phase === 'answer';
   const correct = assertValidChoices(p.choices);
   const clipActive = Boolean(p.clipUrl) && seconds < (p.clipDurationSeconds ?? p.durationSeconds);
@@ -299,7 +300,7 @@ export function LasFijasVideo(p: VideoProps) {
           >
             {reveal
               ? `✓ Respuesta correcta · ${correct.label}`
-              : `Piensa tu respuesta · ${Math.max(1, Math.ceil(LAS_FIJAS.answerAt - seconds))} s`}
+              : `Piensa tu respuesta · ${Math.max(1, Math.ceil(timing.answerAt - seconds))} s`}
           </div>
         </div>
       )}
@@ -345,7 +346,10 @@ export function LasFijasVideo(p: VideoProps) {
           color: '#62626b',
         }}
       >
-        <span>{p.demo ? 'VISTA DE DISEÑO · SIN VOZ' : 'ANIMACIÓN IA · SIN VOZ'}</span>
+        <span>
+          {p.demo ? 'ANIMACIÓN LOCAL' : 'ANIMACIÓN IA'} ·{' '}
+          {p.narrationTiming ? 'VOZ GEMINI' : 'SIN VOZ'}
+        </span>
         <span style={{ color: '#bd1737', fontWeight: 800 }}>ingresa.pe ↗</span>
       </footer>
     </AbsoluteFill>

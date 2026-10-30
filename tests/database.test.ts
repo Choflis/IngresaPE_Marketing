@@ -4,6 +4,12 @@ import bcrypt from 'bcryptjs';
 import path from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { buildFalGeneration, FAL_TEXT_MODEL } from '../src/lib/fal-contract';
+import { GEMINI_TTS_MODEL } from '../src/lib/voices';
+vi.mock('../src/server/narration', () => ({ prepareNarration: vi.fn() }));
+vi.mock('../src/server/render', async (original) => ({
+  ...(await original<typeof import('../src/server/render')>()),
+  renderVideo: vi.fn(),
+}));
 vi.mock('../src/server/fal', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/server/fal')>()),
   cancelFal: vi.fn(),
@@ -37,6 +43,7 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
     delete process.env.FAL_KEY;
     delete process.env.FAL_MODEL;
     delete process.env.FAL_MONTHLY_BUDGET_CENTS;
+    delete process.env.GEMINI_API_KEY;
     await db.query('TRUNCATE users,areas,courses,sources,templates RESTART IDENTITY CASCADE');
     owner = (
       await db.query(
@@ -77,6 +84,145 @@ describe.skipIf(!enabled)('PostgreSQL real · producción y normalización', () 
       approved,
     });
   }
+  it('congela la voz elegida y conserva sin voz los lotes anteriores', async () => {
+    process.env.GEMINI_API_KEY = 'test-only-key';
+    const q = await question();
+    const b = await production.createBatch(
+      {
+        questionIds: [q.id],
+        templateVersionId: templateId,
+        provider: 'demo',
+        voice: { provider: 'gemini', name: 'Fenrir' },
+      },
+      owner,
+      randomUUID(),
+    );
+    expect(
+      (await db.query('SELECT voice FROM video_jobs WHERE batch_id=$1', [b.id]))[0].voice,
+    ).toEqual({ provider: 'gemini', name: 'Fenrir', model: GEMINI_TTS_MODEL });
+    const old = await production.createBatch(
+      { questionIds: [q.id], templateVersionId: templateId, provider: 'demo' },
+      owner,
+      randomUUID(),
+    );
+    expect(
+      (await db.query('SELECT voice FROM video_jobs WHERE batch_id=$1', [old.id]))[0].voice,
+    ).toBeNull();
+  });
+  it('rechaza voz sin clave, selección inválida y narración sobre imágenes', async () => {
+    const q = await question();
+    const input = {
+      questionIds: [q.id],
+      templateVersionId: templateId,
+      provider: 'demo',
+      voice: { provider: 'gemini', name: 'Puck' },
+    };
+    await expect(production.createBatch(input, owner, randomUUID())).rejects.toThrow(
+      /GEMINI_API_KEY/,
+    );
+    process.env.GEMINI_API_KEY = 'test-only-key';
+    await expect(
+      production.createBatch(
+        { ...input, voice: { provider: 'gemini', name: 'inventada' } },
+        owner,
+        randomUUID(),
+      ),
+    ).rejects.toThrow();
+    const image = await catalog.createTemplate({
+      name: 'Imagen prueba',
+      description: '',
+      kind: 'image',
+      accent: '#C80727',
+      durationSeconds: 30,
+      composition: 'daily',
+    });
+    const template = (await catalog.getTemplates()).find((t) => t.id === image.id)!;
+    await expect(
+      production.createBatch(
+        { ...input, templateVersionId: template.version_id },
+        owner,
+        randomUUID(),
+      ),
+    ).rejects.toThrow(/video/i);
+    expect((await db.query('SELECT count(*)::int n FROM batches'))[0].n).toBe(0);
+  });
+  it('prepara voz antes de fal y termina el MP4 local pasando audio y tiempos al montaje', async () => {
+    process.env.GEMINI_API_KEY = 'test-only-key';
+    const q = await question();
+    const b = await production.createBatch(
+      {
+        questionIds: [q.id],
+        templateVersionId: templateId,
+        provider: 'demo',
+        voice: { provider: 'gemini', name: 'Achird' },
+      },
+      owner,
+      randomUUID(),
+    );
+    const [j] = await db.query('SELECT * FROM video_jobs WHERE batch_id=$1', [b.id]);
+    const speech = await import('../src/server/narration');
+    const render = await import('../src/server/render');
+    const timing = { questionAt: 3, answerAt: 10, outroAt: 13 };
+    vi.mocked(speech.prepareNarration).mockResolvedValue({
+      audioPath: '/private/narration.wav',
+      timing,
+    });
+    vi.mocked(render.renderVideo).mockImplementation(async (_props, output) => {
+      await writeFile(output, 'rendered MP4 fixture');
+    });
+    const { processJob } = await import('../src/server/process-job');
+    await processJob(j.id);
+    expect(speech.prepareNarration).toHaveBeenCalledWith(
+      expect.objectContaining({ statement: '¿Qué orgánulo participa en la respiración celular?' }),
+      { provider: 'gemini', name: 'Achird', model: GEMINI_TTS_MODEL },
+      expect.any(String),
+      15,
+      expect.any(Function),
+    );
+    expect(render.renderVideo).toHaveBeenCalledWith(
+      expect.objectContaining({ narrationTiming: timing }),
+      expect.any(String),
+      undefined,
+      '/private/narration.wav',
+    );
+    expect(
+      (await db.query('SELECT status,output_asset_id FROM video_jobs WHERE id=$1', [j.id]))[0],
+    ).toMatchObject({ status: 'completed', output_asset_id: expect.any(String) });
+  });
+  it('no solicita fal ni marca éxito cuando la voz no cabe o queda sin confirmación', async () => {
+    process.env.GEMINI_API_KEY = 'test-only-key';
+    process.env.FAL_KEY = 'test-key-never-sent';
+    process.env.FAL_MODEL = FAL_TEXT_MODEL;
+    const q = await question();
+    const speech = await import('../src/server/narration');
+    const { NarrationError } = await import('../src/server/gemini-tts');
+    const { processJob } = await import('../src/server/process-job');
+    const fal = await import('../src/server/fal');
+    for (const kind of ['too_long', 'uncertain'] as const) {
+      const b = await production.createBatch(
+        {
+          questionIds: [q.id],
+          templateVersionId: templateId,
+          provider: 'fal',
+          voice: { provider: 'gemini', name: 'Puck' },
+        },
+        owner,
+        randomUUID(),
+      );
+      const [j] = await db.query('SELECT id FROM video_jobs WHERE batch_id=$1', [b.id]);
+      vi.mocked(speech.prepareNarration).mockRejectedValue(
+        new NarrationError('Narración: revisa el contenido.', kind),
+      );
+      await processJob(j.id);
+      expect(
+        (await db.query('SELECT status,error_message FROM video_jobs WHERE id=$1', [j.id]))[0],
+      ).toEqual({
+        status: kind === 'uncertain' ? 'needs_attention' : 'failed',
+        error_message: 'Narración: revisa el contenido.',
+      });
+    }
+    expect(fal.submitFal).not.toHaveBeenCalled();
+  });
   it('conserva la composición y congela el modelo y 450 cuadros en cada trabajo fal', async () => {
     const t = await catalog.createTemplate({
       name: 'Las fijas personalizada',

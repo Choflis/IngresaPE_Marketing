@@ -84,7 +84,7 @@ export function FormatDetail({
           <span className="preview-caption">
             {reference && d.referenceVideoAvailable
               ? 'Referencia original · 20 segundos · incluye su audio'
-              : 'Vista del diseño · fal.ai genera la animación sin voz'}
+              : 'Vista del diseño sin narración · elige la voz al producir'}
           </span>
         </div>
         <div className="format-detail-copy">
@@ -115,13 +115,15 @@ export function FormatDetail({
               <small>Voz para este formato</small>
               <strong>
                 {t.kind === 'video'
-                  ? 'Pendiente · por ahora sin voz'
+                  ? d.narration.configured
+                    ? 'Cuatro voces de Gemini disponibles'
+                    : 'Configura Gemini para añadir narración'
                   : 'Sin voz · publicación visual'}
               </strong>
             </div>
             {t.kind === 'video' && (
               <button className="text-button" onClick={onVoices}>
-                Ver referencia de voz
+                Escuchar voces
               </button>
             )}
           </div>
@@ -143,7 +145,8 @@ export function FormatDetail({
               </ol>
               <p className="detail-note">
                 Las letras, los números y la clave se componen desde tu contenido aprobado. La IA
-                anima al personaje. La voz se incorporará más adelante.
+                anima al personaje. Con voz, estos tiempos se ajustan a la narración manteniendo los
+                30 segundos y una pausa antes de revelar la respuesta.
               </p>
             </>
           )}

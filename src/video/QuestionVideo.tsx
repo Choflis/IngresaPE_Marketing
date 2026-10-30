@@ -22,6 +22,7 @@ export type VideoProps = {
   challenge?: boolean;
   composition?: CompositionKey;
   clipDurationSeconds?: number;
+  narrationTiming?: import('../lib/narration').NarrationTiming;
 };
 export function QuestionVideo(p: VideoProps) {
   try {
@@ -54,10 +55,13 @@ function DinoVideo(p: VideoProps) {
   assertValidChoices(p.choices);
   const f = useCurrentFrame();
   const { durationInFrames, fps } = useVideoConfig();
-  const reveal = f > durationInFrames * 0.67;
+  const answerFrame = p.narrationTiming
+    ? Math.round(p.narrationTiming.answerAt * fps)
+    : Math.floor(durationInFrames * 0.67) + 1;
+  const reveal = f >= answerFrame;
   const sway = Math.sin((f / fps) * 2) * 2;
   const dense = p.statement.length + p.choices.reduce((n, c) => n + c.text.length, 0) > 450;
-  const remaining = Math.max(0, Math.ceil((durationInFrames * 0.67 - f) / fps));
+  const remaining = Math.max(0, Math.ceil((answerFrame - f) / fps));
   return (
     <AbsoluteFill
       style={{ background: '#090D16', fontFamily: 'Arial, sans-serif', color: '#F5F6FA' }}

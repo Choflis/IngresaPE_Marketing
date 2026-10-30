@@ -28,6 +28,12 @@ La muestra local de Las fijas en Biblioteca conserva **30.000000 segundos**, 720
 
 Los modelos configurados son LongCat Video Distilled 480p desde imagen (predeterminado) y desde texto (alternativa). La referencia de costo es US$0.005 por segundo: 30 segundos son 450 cuadros y US$0.15. La reserva mensual no consulta el saldo de fal.ai y conserva envíos que puedan haber sido cobrados.
 
-La voz y la sincronización labial están pendientes. La sección Voces conserva el audio de referencia, sin afirmar que exista una voz conectada. El video original en `ejemplo_Video/` está excluido de Git y Docker; el checkout funciona sin él.
+La narración de Gemini está integrada en el creador y en el worker, con Puck, Sadachbia, Achird y Fenrir. La sincronización labial permanece pendiente; se sincronizan el contenido visual y la narración, sin modificar la boca del personaje. El video original en `ejemplo_Video/` está excluido de Git y Docker; el checkout funciona sin él.
 
 Esta actualización no repite el build de la imagen Docker ni la prueba de carga. El almacenamiento debe respaldarse y dimensionarse. El panel carga hasta 1.000 preguntas y 300 trabajos/archivos recientes, y cada lote admite 25 preguntas.
+
+## Narración integrada · 29 de octubre de 2026
+
+Se generó una prueba real desde la API de lotes y el worker con Gemini Puck y animación local, sin solicitar inferencias a fal.ai: **Las fijas · prueba narrada Puck · 30 s**, disponible en Biblioteca. FFprobe confirmó **30.000000 segundos**, video H.264 de 720 × 1280 a 30 fps y una pista de voz AAC de 30 segundos. Se reutilizó la introducción guardada y Gemini produjo tres segmentos nuevos. La pregunta aparece en el segundo 3,433; la clave A, Música, se revela en 14,033; el cierre empieza en 27,1. Se revisaron fotogramas anteriores y posteriores a la revelación: alternativas sin repetir, solo A marcada y explicación completa.
+
+La suite de navegador pasó **13 pruebas**, incluida selección y persistencia de voz, muestra reproducible y versión móvil sin desbordamiento. PostgreSQL real pasó **19 pruebas**, cubriendo la voz congelada en el trabajo, validación de clave, errores de narración antes de fal.ai y montaje con audio. La revisión independiente detectó un HTTP 408 tratado como rechazo reintentable; se corrigió con una regresión que conserva su estado incierto. No se probó facturación real ni sincronización labial.

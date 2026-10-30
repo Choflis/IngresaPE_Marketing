@@ -8,6 +8,7 @@ import { assertLasFijasLayout, assertValidChoices } from '../lib/video-format';
 import { estimateFalCostCents } from '../lib/fal-contract';
 import { generationFor } from './fal-input';
 import { getProviderSettings } from './provider-settings';
+import { GEMINI_TTS_MODEL } from '../lib/voices';
 export async function createBatch(input: unknown, ownerId: string, key: string) {
   const v = batchInput.parse(input);
   return transaction(async (c) => {
@@ -26,6 +27,14 @@ export async function createBatch(input: unknown, ownerId: string, key: string) 
       )
     ).rows[0];
     if (!t) throw new HttpError(400, 'Formato inexistente.');
+    if (v.voice && t.kind !== 'video')
+      throw new HttpError(400, 'La narración solo está disponible para formatos de video.');
+    if (v.voice && !process.env.GEMINI_API_KEY?.trim())
+      throw new HttpError(
+        400,
+        'Configura GEMINI_API_KEY en el servidor para generar videos con voz.',
+      );
+    const voice = v.voice ? { ...v.voice, model: GEMINI_TTS_MODEL } : null;
     const provider = t.kind === 'video' ? v.provider : 'demo';
     const settings = getProviderSettings();
     if (provider === 'fal' && !publicProviderStatus().configured)
@@ -75,7 +84,7 @@ export async function createBatch(input: unknown, ownerId: string, key: string) 
     ).rows[0];
     for (const e of entries)
       await c.query(
-        'INSERT INTO video_jobs(batch_id,question_version_id,template_version_id,provider,estimated_cost_cents,generation_config) VALUES($1,$2,$3,$4,$5,$6)',
+        'INSERT INTO video_jobs(batch_id,question_version_id,template_version_id,provider,estimated_cost_cents,generation_config,voice) VALUES($1,$2,$3,$4,$5,$6,$7)',
         [
           batch.id,
           e.id,
@@ -83,6 +92,7 @@ export async function createBatch(input: unknown, ownerId: string, key: string) 
           provider,
           e.cost,
           provider === 'fal' ? await generationFor(t.duration_seconds, settings.model) : null,
+          voice,
         ],
       );
     return batch;

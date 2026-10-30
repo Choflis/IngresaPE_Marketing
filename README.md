@@ -17,12 +17,12 @@
 
 - **Catálogo de formatos:** el inicio reúne videos, imágenes y carruseles. Puedes abrir cada formato y entrar al creador con él seleccionado. Las copias idénticas se agrupan visualmente, conservando sus versiones y trabajos.
 - **Las fijas:** formato propio de 30 segundos basado en el ejemplo de la marca; presentación, lectura con cuenta regresiva, clave revisada y explicación, y cierre. El texto y las alternativas se componen con código, sin pedir a la IA que dibuje respuestas.
-- **Voz pendiente:** escuchar y descargar el audio original de referencia. Por ahora las producciones no incluyen narración.
+- **Narración integrada:** elegir Puck, Sadachbia, Achird o Fenrir, comparar sus muestras y generar un MP4 con pregunta, alternativas, respuesta y explicación narradas por Gemini.
 - **Banco de preguntas:** organizar por Biomédicas, Ingenierías y Sociales, curso, tema y dificultad; guardar alternativas y explicación; aprobar antes de producir.
 - **Formatos reutilizables:** Dino responde, reto con cuenta regresiva, pregunta del día y carrusel. Crear variantes de color y duración de demostración.
 - **Producción por lotes:** hasta 25 preguntas por lote, cola persistente y concurrencia configurable.
 - **Dinosaurio animado con fal.ai:** generar la animación con LongCat Video Distilled 480p, desde imagen o texto; conservar pregunta, marca y diseño con Remotion.
-- **Demostración local:** producir MP4 con movimiento sencillo de la mascota, sin voz ni sincronización labial, rotulado como demostración. Permite probar todo el circuito sin pagar una API.
+- **Demostración local:** producir MP4 con movimiento sencillo de la mascota, con narración opcional de Gemini. Elige Sin voz para probar el circuito sin consumir una API. La animación no incluye sincronización labial.
 - **Imágenes y carruseles:** PNG de 1080 × 1350; tres archivos por carrusel, compuestos localmente.
 - **Biblioteca privada:** reproducir, subir imágenes y descargar medios mediante sesión.
 - **Guion asistido:** preparar un borrador desde una explicación aprobada, con Gemini opcional.
@@ -62,7 +62,7 @@ Si necesitas cambiar la contraseña: modifica `ADMIN_PASSWORD` en `.env` y ejecu
 1. Entra a **Crear contenido** y selecciona preguntas aprobadas por área.
 2. Continúa a **Formato** y elige cómo presentar la lección.
 3. En **Revisión**, comprueba la respuesta correcta y la explicación.
-4. En **Producción**, selecciona **Video local** para crear un MP4 sin API, o genera el PNG/carrusel. Verás el resumen antes de enviar.
+4. En **Producción**, selecciona **Video local** y **Sin voz** para crear un MP4 sin API, o genera el PNG/carrusel. Verás el resumen antes de enviar.
 5. Sigue el lote en Vista general y descarga desde **Biblioteca**. Puedes retroceder o ir a Configuración sin perder la selección mientras mantengas abierta la página.
 
 Para revisar el formato de referencia con un MP4 real de 30 segundos, sin generación ni costo de API:
@@ -73,11 +73,20 @@ npm run preview:las-fijas
 
 El comando guarda **Las fijas · 30 s · diseño sin voz.mp4** en Biblioteca y verifica su duración con FFprobe. Repetirlo actualiza la misma muestra. Es una vista del diseño con la imagen de referencia, no una generación de fal.ai.
 
-En **Las fijas**, la pregunta aparece de 2 a 10 segundos; la clave y la explicación, de 10 a 27, y el cierre ocupa los últimos 3 segundos. La legibilidad se valida antes de producir, incluyendo la altura estimada de las alternativas. La IA solo anima al personaje; Remotion dibuja los textos y marca la respuesta del banco aprobado.
+En **Las fijas sin voz**, la pregunta aparece de 2 a 10 segundos; la clave y la explicación, de 10 a 27, y el cierre ocupa los últimos 3 segundos. Con narración, las transiciones se ajustan a las duraciones reales de voz, dejando al menos dos segundos para pensar y manteniendo los 30 segundos totales. La legibilidad se valida antes de producir, incluyendo la altura estimada de las alternativas. La IA solo anima al personaje; Remotion dibuja los textos y marca la respuesta del banco aprobado.
 
-### Voz de referencia
+### Generar videos con voz
 
-La sección **Voces** conserva el audio del ejemplo para comparar timbre y ritmo cuando se integre una voz. LongCat no incluye narración ni sincronización labial en este flujo. No se ha elegido un proveedor de voz.
+1. Guarda `GEMINI_API_KEY` en el `.env` privado del servidor. Puedes crearla en [Google AI Studio](https://aistudio.google.com/apikey). Reinicia web y worker después de cambiar variables.
+2. En **Voces**, compara las cuatro muestras guardadas con el audio original de referencia. Escucharlas no genera nuevas solicitudes.
+3. En **Crear contenido → Producción**, elige la voz. Puck aparece seleccionada cuando Gemini está configurado; también puedes elegir **Sin voz**.
+4. Elige **Video local** para probar la narración con la imagen animada, o **fal.ai** para generar la animación del dinosaurio. Ambos entregan la voz dentro del MP4.
+
+Se utiliza `gemini-3.1-flash-tts-preview`, el mismo modelo de las muestras, con el nombre de voz congelado en cada trabajo. Google lo considera un modelo preview anterior; se mantiene para conservar la interpretación elegida y no se sustituye automáticamente. Tiene [cuota gratuita y tarifas para cuentas con facturación](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.1-flash-tts-preview): la integración no puede convertir una cuenta facturada en gratuita. La reserva del panel corresponde a fal.ai y no incluye Gemini.
+
+La narración usa el contenido aprobado, incluida la letra correcta. Se prepara antes de solicitar una nueva animación a fal.ai. Si no cabe con un máximo de aceleración de 1,25 y conservación del tono, el trabajo pide acortar el contenido. No se recorta la explicación ni se reemplaza por texto inventado. Gemini puede interpretar de forma imperfecta fórmulas o pronunciaciones: revisa el MP4 antes de publicarlo.
+
+Los segmentos se guardan en `storage/jobs/<id>/`, fuera de `public`. Reintentar un montaje reutiliza los audios y el clip originales. Una cuota rechazada permite reintentar después; una petición sin respuesta confirmada pasa a **Requiere revisión** y no se reenvía automáticamente. Los trabajos anteriores siguen sin voz. LongCat no realiza sincronización labial: esta integración sincroniza el audio con la pregunta y la revelación de la respuesta.
 
 El video original en `ejemplo_Video/` se mantiene local y está excluido de Git. Si existe, puedes reproducirlo desde el detalle de Las fijas. En otra instalación sin ese archivo, la plantilla funciona normalmente y no muestra ese control. La imagen del personaje y el audio de referencia sí acompañan al proyecto.
 
@@ -153,7 +162,8 @@ Navegador → Next.js + sesión → PostgreSQL normalizado
                                   ↓ trabajos persistentes
                               pg-boss → worker
                                          ├─ fal.ai → animación sin voz
-                                         ├─ Remotion → MP4
+                                         ├─ Gemini TTS → narración y tiempos
+                                         ├─ Remotion + FFmpeg → MP4 con voz
                                          └─ Sharp → PNG / carrusel
                                               ↓
                                     almacenamiento privado
@@ -185,9 +195,9 @@ npm run test:e2e
 
 ## Alcance de esta versión
 
-Herramienta para un propietario. No publica automáticamente en redes. Los formatos son variantes de las composiciones incluidas; no hay editor libre de escenas. La calidad de animación de fal.ai requiere comprobarse con una generación real; la voz queda pendiente. Los formatos cortos admiten hasta 240 caracteres de pregunta, 400 de explicación y 650 entre pregunta y alternativas, para conservar legibilidad. El listado carga hasta 1.000 preguntas y los 300 trabajos/archivos más recientes; la base y la cola conservan los demás.
+Herramienta para un propietario. No publica automáticamente en redes. Los formatos son variantes de las composiciones incluidas; no hay editor libre de escenas. La calidad de animación de fal.ai requiere comprobarse con una generación real; la narración de Gemini se integra en el montaje final. Los formatos cortos admiten hasta 240 caracteres de pregunta, 400 de explicación y 650 entre pregunta y alternativas, para conservar legibilidad. El listado carga hasta 1.000 preguntas y los 300 trabajos/archivos más recientes; la base y la cola conservan los demás.
 
-El MP4 de demostración anima la imagen de marca, **no utiliza fal.ai ni incluye voz**. Las imágenes con plantillas evitan una API visual pagada, pero consumen servidor, almacenamiento y, si se habilita, modelos externos.
+El video local anima la imagen de marca sin utilizar fal.ai y permite añadir narración de Gemini. La muestra creada con `preview:las-fijas` sigue siendo una vista de diseño sin voz ni llamadas de API. Las imágenes con plantillas evitan una API visual pagada, pero consumen servidor, almacenamiento y, si se habilita, modelos externos.
 
 ## Créditos
 

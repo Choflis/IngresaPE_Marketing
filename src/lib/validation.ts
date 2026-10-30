@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { assertValidChoices, compositionKeys } from './video-format';
+import { voiceSelectionSchema } from './voices';
 export const questionInput = z
   .object({
     statement: z.string().trim().min(10).max(700),
@@ -40,6 +41,7 @@ export const batchInput = z.object({
     .transform((v) => [...new Set(v)]),
   templateVersionId: z.number().int().positive(),
   provider: z.enum(['demo', 'fal']),
+  voice: voiceSelectionSchema.nullable().default(null),
   name: z.string().trim().max(100).default('Nueva producción'),
 });
 export const templateInput = z.object({

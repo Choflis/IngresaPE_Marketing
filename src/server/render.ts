@@ -6,6 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import sharp from 'sharp';
+import { muxNarration } from './mux-audio';
 import type { VideoProps } from '../video/QuestionVideo';
 let bundled: Promise<string> | undefined;
 export async function durationOf(file: string) {
@@ -23,7 +24,12 @@ export async function durationOf(file: string) {
     throw new Error('Duración de video inválida (máximo 5 minutos).');
   return n;
 }
-export async function renderVideo(props: VideoProps, output: string, clipPath?: string) {
+export async function renderVideo(
+  props: VideoProps,
+  output: string,
+  clipPath?: string,
+  narrationPath?: string,
+) {
   bundled ??= bundle({
     entryPoint: path.resolve('src/video/Root.tsx'),
     publicDir: path.resolve('public'),
@@ -75,12 +81,14 @@ export async function renderVideo(props: VideoProps, output: string, clipPath?: 
       serveUrl,
       composition,
       codec: 'h264',
-      outputLocation: output,
+      outputLocation: narrationPath ? `${output}.silent.mp4` : output,
       inputProps: input,
       concurrency: Number(process.env.RENDER_CONCURRENCY ?? 1),
       chromiumOptions: { gl: 'angle', disableWebSecurity: false },
       timeoutInMilliseconds: 120000,
     });
+    if (narrationPath)
+      await muxNarration(`${output}.silent.mp4`, narrationPath, output, props.durationSeconds);
     await stat(output);
   } finally {
     server?.close();

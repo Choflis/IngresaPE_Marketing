@@ -7,6 +7,8 @@ import { jobDirectory, saveOutput } from './storage';
 import { durationOf, renderImage, renderVideo } from './render';
 import type { VideoProps } from '../video/QuestionVideo';
 import { assertValidChoices } from '../lib/video-format';
+import { prepareNarration } from './narration';
+import { NarrationError } from './gemini-tts';
 export async function processJob(id: string) {
   // Session advisory lock prevents duplicate processing across worker processes, including recovered leases.
   const c = await import('../lib/db').then((m) => m.pool.connect());
@@ -46,6 +48,16 @@ export async function processJob(id: string) {
     };
     let first: string | null = null;
     if (j.kind === 'video') {
+      if (await cancelled(id)) return;
+      let narration: Awaited<ReturnType<typeof prepareNarration>> = null;
+      if (j.voice) {
+        await setState(id, 'rendering');
+        narration = await prepareNarration(q, j.voice, dir, j.duration_seconds, () =>
+          cancelled(id),
+        );
+        if (!narration || (await cancelled(id))) return;
+        props.narrationTiming = narration.timing;
+      }
       let clip: string | undefined;
       if (j.provider === 'fal') {
         clip = (await providerClip(id, j.generation_config, dir)) ?? undefined;
@@ -64,7 +76,7 @@ export async function processJob(id: string) {
       if (await cancelled(id)) return;
       await setState(id, 'rendering');
       const file = path.join(dir, 'video.mp4');
-      await renderVideo(props, file, clip);
+      await renderVideo(props, file, clip, narration?.audioPath);
       first = await saveOutput(
         j.owner_id,
         id,
@@ -98,6 +110,10 @@ export async function processJob(id: string) {
   } catch (e) {
     // Technical failures only retry the same task/clip. Submission ambiguity is handled above.
     if (await cancelled(id)) return;
+    if (e instanceof NarrationError) {
+      await setState(id, e.kind === 'uncertain' ? 'needs_attention' : 'failed', e.message);
+      return;
+    }
     const [{ attempts }] = await query('SELECT attempts FROM video_jobs WHERE id=$1', [id]);
     if (attempts < 3) {
       await setState(
